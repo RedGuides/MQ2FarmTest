@@ -2,14 +2,15 @@
 // Chatwiththisname/PeteSampras - Started MQ2Farm Initial Setup/Preperation
 // Chatwiththisname/Renji - 10/07/2018 - Worked SpawnSearch and Nav Code
 // Chatwiththisname 10/8/2018 - Working on Algorithms for Farming.
-//					|	Adding FarmCommand Functionality.
-//					|	Added Health/Endurance/Mana Checks, still requires logic for resting routines.
-//					|	Added HaveAggro() function. Returns true if any Autohaters are populated on Xtargetlist. 
+//							  - Adding FarmCommand Functionality.
+//							  - Added Health/Endurance/Mana Checks, still requires logic for resting routines.
+//							  - Added HaveAggro() function. Returns true if any Autohaters are populated on Xtargetlist. 
 // Chatwiththisname 10/16/2018 - Test has been down a while, but added a getFirstAggroed() function to try and
-//					|	deal with aggro before trying to find a mob with a shortest path to fix
-//					|	ignoring aggrod mobs. 
+//							   - deal with aggro before trying to find a mob with a shortest path to fix
+//							   - ignoring aggrod mobs. 
 // Chatwiththisname 11/12/2018 - Working on CastDetrimental() function to cast single target detrimental spells.
-// Chatwiththisname 1/2/2019 - Cleaning up the code
+//							   - Added rest routines.
+// Chatwiththisname 1/2/2019 - Cleaning up the code to remove all the comments.
 //							 - trying to add Discs to combat routines, not having much luck.
 //							 - Separated FarmTest into seperate files.
 //							 - Tried adding TLO and member support. No luck, but kept the file.
