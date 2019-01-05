@@ -17,9 +17,14 @@
 // Chatwiththisname 1/3/2019 - Now generating a list of Discs for toons to use and separating them to sections. 
 //							 - Firing Discs during combat based on the previously mentioned list.
 //							 - DiscReady function now checks endurance/mana/reagent requirements before reporting true.
-//							 - Actually enjoying testing this on my berserker. He's doing pretty good DPS without MQ2Melee. 
+//							 - Actually enjoying testing this on my berserker. He's doing pretty good DPS without MQ2Melee.
+// Chatwiththisname 1/5/2019 - Got the Farm datatype fixed and added two members. TargetID and Version. ${Farm.TargetID} ${Farm.Version}
 
 
+//#define MerchSelect(X) if (pMerchantWnd) *((PEQMERCHWINDOW*)pMerchantWnd)->SelectedSlotID)=X
+#define PLUGIN_NAME "MQ2FarmTest"
+#define VERSION "0.1"
+#define PLUGINMSG "\ar[\a-tMQ2Farm\ar]\ao:: "
 #include "../MQ2Plugin.h"
 #include "Prototypes.h"
 #include "Variables.h"
@@ -29,30 +34,31 @@
 using namespace std;
 
 bool pulsing = false;
-//#define MerchSelect(X) if (pMerchantWnd) *((PEQMERCHWINDOW*)pMerchantWnd)->SelectedSlotID)=X
-#define PLUGIN_NAME "MQ2FarmTest"
-#define VERSION 0.1
-#define PLUGINMSG "\ar[\a-tMQ2Farm\ar]\ao:: "
+
 
 PreSetup(PLUGIN_NAME);
-PLUGIN_VERSION(VERSION);
+PLUGIN_VERSION(atof(VERSION));
 
 // Called once, when the plugin is to initialize
 PLUGIN_API VOID InitializePlugin(VOID)
 {
 	CheckAlias();
 	DoINIThings();
+	AddMQ2Data("Farm", dataFarm);
+	pFarmType = new MQ2FarmType;
 	AddCommand("/farm", FarmCommand);
 	AddCommand("/ignorethese", IgnoreTheseCommand);
 	AddCommand("/ignorethis", IgnoreThisCommand);
 	DiscSetup();
-	WriteChatf("%s\aw- \agv0.1",PLUGINMSG);
+	WriteChatf("%s\aw- \ag%s",PLUGINMSG,VERSION);
+	
 }
 
 // Called once, when the plugin is to shutdown
 PLUGIN_API VOID ShutdownPlugin(VOID)
 {
 	PluginOff();
+	RemoveMQ2Data("Farm");
 	RemoveCommand("/farm");
 	RemoveCommand("/ignorethese");
 	RemoveCommand("/ignorethis");
@@ -587,11 +593,11 @@ void ListCommands()
 	//WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/farm status \aw--- \atDisplay if the plugin is On/Off.");
 	WriteChatf("%s\ay/farm radius #### \aw--- \atWill set radius to number provided.", PLUGINMSG);
 	WriteChatf("%s\ay/farm zradius #### \aw--- \atWill set zradius to number provided.", PLUGINMSG);
-	WriteChatf("%s\ar[\a-tMQ2Farm\ar]\ao::\ay/farm farmmob \"Mob Name Here\" \aw--- \atWill specify a farmmob to farm.", PLUGINMSG);
-	WriteChatf("%s\ar[\a-tMQ2Farm\ar]\ao::\ay/farm farmmob clear \aw--- \atWill clear the FarmMob and attack anything not on an alertlist.", PLUGINMSG);
-	WriteChatf("%s\ar[\a-tMQ2Farm\ar]\ao::\ay/farm castdetrimental 1|On 0|Off \aw--- \atWill turn on and off casting of single target detrimental spells.", PLUGINMSG);
-	WriteChatf("%s\ar[\a-tMQ2Farm\ar]\ao::\ay/ignorethis \aw--- \atWill temporarily ignore your current target.", PLUGINMSG);
-	WriteChatf("%s\ar[\a-tMQ2Farm\ar]\ao::\ay/ignorethese \aw--- \atWill temporarily ignore all spawns with this targets clean name.", PLUGINMSG);
+	WriteChatf("%s\ay/farm farmmob \"Mob Name Here\" \aw--- \atWill specify a farmmob to farm.", PLUGINMSG);
+	WriteChatf("%s\ay/farm farmmob clear \aw--- \atWill clear the FarmMob and attack anything not on an alertlist.", PLUGINMSG);
+	WriteChatf("%s\ay/farm castdetrimental 1|On 0|Off \aw--- \atWill turn on and off casting of single target detrimental spells.", PLUGINMSG);
+	WriteChatf("%s\ay/ignorethis \aw--- \atWill temporarily ignore your current target.", PLUGINMSG);
+	WriteChatf("%s\ay/ignorethese \aw--- \atWill temporarily ignore all spawns with this targets clean name.", PLUGINMSG);
 	//WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/loadignore \aw--- \atWill loadignores from the Ignore_Mobs.ini in the macro folder.");
 }
 
@@ -1000,22 +1006,22 @@ BOOL DiscReady(PSPELL pSpell)
 	DWORD timeNow = (DWORD)time(NULL);
 	if (pPCData->GetCombatAbilityTimer(pSpell->ReuseTimerIndex, pSpell->SpellGroup) < timeNow) {
 		if (GetCharInfo()->pSpawn->ManaCurrent >= (int)pSpell->ManaCost && GetCharInfo()->pSpawn->EnduranceCurrent >= (int)pSpell->EnduranceCost) {
-			
-			if (pSpell->CasterRequirementID == 518) {
+			DWORD ReqID = pSpell->CasterRequirementID;
+			if (ReqID == 518) {
 				//Requires under 90% hitpoints
 				if (PercentHealth() > 89) return false;
 			}
-			else if (pSpell->CasterRequirementID == 825) {
+			else if (ReqID == 825) {
 				//Requires under 21% Endurance
-				if (PercentEndurance() > 21) return false;
+				if (PercentEndurance() > 20) return false;
 			}
-			else if (pSpell->CasterRequirementID == 826) {
+			else if (ReqID == 826) {
 				//Requires under 25% Endurance
-				if (PercentEndurance() > 25) return false;
+				if (PercentEndurance() > 24) return false;
 			}
-			else if (pSpell->CasterRequirementID == 827) {
+			else if (ReqID == 827) {
 				//Requires under 29% Endurance
-				if (PercentEndurance() > 29) return false;
+				if (PercentEndurance() > 28) return false;
 			}
 			for (int i = 0; i < 4; i++) {
 				if (pSpell->ReagentCount[i] > 0) {
