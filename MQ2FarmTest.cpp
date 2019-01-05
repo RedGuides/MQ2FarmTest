@@ -19,6 +19,9 @@
 //							 - DiscReady function now checks endurance/mana/reagent requirements before reporting true.
 //							 - Actually enjoying testing this on my berserker. He's doing pretty good DPS without MQ2Melee.
 // Chatwiththisname 1/5/2019 - Got the Farm datatype fixed and added two members. TargetID and Version. ${Farm.TargetID} ${Farm.Version}
+//							 - Cleaned up FarmCommand and it not report invalid command.
+//							 - Made additions to ignorethese and ignorethis.
+//							 - "/farm " Help list of commands updated to show all commands for current build.
 
 
 //#define MerchSelect(X) if (pMerchantWnd) *((PEQMERCHWINDOW*)pMerchantWnd)->SelectedSlotID)=X
@@ -275,8 +278,14 @@ void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine)
 			Alert(GetCharInfo()->pSpawn, IgnoreString);
 			MyTargetID = 0;
 			ClearTarget();
+			return;
 		}
 	}
+	else {
+		Alert(GetCharInfo()->pSpawn, szLine);
+		return;
+	}
+	WriteChatf("%s \atYou must have a target or provide a NPC name to ignore. Please try again.", PLUGINMSG);
 }
 
 void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
@@ -289,6 +298,9 @@ void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine)
 			MyTargetID = 0;
 			ClearTarget();
 		}
+	}
+	else {
+		WriteChatf("%s \atYou cannot use a name for this ignore command. It will only use your target. \arNothing added to ignore!");
 	}
 }
 
@@ -313,11 +325,13 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 		if (!_stricmp(Arg1, "on")) {
 			DoINIThings();
 			PluginOn();
+			return;
 		}
 
 		if (!_stricmp(Arg1, "off"))
 		{
 			PluginOff();
+			return;
 		}
 
 		if (!_stricmp(Arg1, "radius"))
@@ -329,8 +343,10 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				WritePrivateProfileString("Pull", "Radius", Arg2, INIFileName);
 				sprintf_s(searchString, MAX_STRING, "npc noalert 1 radius %i zradius %i targetable %s", Radius, ZRadius, FarmMob);
 				WriteChatf("%s\atRadius is now: \ap%i", PLUGINMSG, Radius);
+				return;
 			} else {
 				WriteChatf("%s\atRadius: \ap%i", PLUGINMSG, Radius);
+				return;
 			}
 		}
 
@@ -343,8 +359,10 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				WritePrivateProfileString("Pull", "ZRadius", Arg2, INIFileName);
 				sprintf_s(searchString, MAX_STRING, "npc noalert 1 radius %i zradius %i targetable %s", Radius, ZRadius, FarmMob);
 				WriteChatf("%s\atZRadius is now: \ap%i", PLUGINMSG, ZRadius);
+				return;
 			} else {
 				WriteChatf("%s\atZRadius: \ap%i", PLUGINMSG, ZRadius);
+				return;
 			}
 		}
 
@@ -354,30 +372,36 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 			if (!strlen(Arg2)) 
 			{
 				WriteChatf("%sCurrent farmmob is %s", PLUGINMSG, FarmMob);
+				return;
 			}
 			if (!IsNumber(Arg2))
 			{
 				if (!_stricmp(Arg2, "clear"))
 				{
 					sprintf_s(FarmMob, MAX_STRING, "");
+					return;
 				}
 				else {
 					sprintf_s(FarmMob, Arg2);
 				}
 				sprintf_s(searchString, MAX_STRING, "npc noalert 1 radius %i zradius %i targetable %s", Radius, ZRadius, FarmMob);
 				WriteChatf("%s\atFarmMob is now: \ap%s", PLUGINMSG, FarmMob);
+				return;
 			}
 		}
 		if (!_stricmp(Arg1, "castdetrimental"))
 		{
 			GetArg(Arg2, Line, 2);
-			if (!strlen(Arg2))
+			if (!strlen(Arg2)) {
 				if (CastDetrimental) {
 					WriteChatf("%sCast Detrimental is On!", PLUGINMSG);
+					return;
 				}
 				else {
 					WriteChatf("%sCast Detrimental is Off!", PLUGINMSG);
+					return;
 				}
+			}
 			if (IsNumber(Arg2))
 			{
 				if (!_stricmp(Arg2, "1"))
@@ -386,6 +410,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 						WriteChatf("%sTurning Cast Detrimental: On!", PLUGINMSG);
 						CastDetrimental = true;
 						WritePrivateProfileString("General", "CastDetrimental", "true", INIFileName);
+						return;
 					}
 				}
 				if (!_stricmp(Arg2, "0")) 
@@ -393,6 +418,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 					if (CastDetrimental) {
 						CastDetrimental = false;
 						WritePrivateProfileString("General", "CastDetrimental", "false", INIFileName);
+						return;
 					}
 				}
 			}
@@ -402,6 +428,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 					if (!CastDetrimental) {
 						CastDetrimental = true;
 						WritePrivateProfileString("General", "CastDetrimental", "true", INIFileName);
+						return;
 					}
 				}
 				if (!_stricmp(Arg2, "off"))
@@ -409,6 +436,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 					if (CastDetrimental) {
 						CastDetrimental = false;
 						WritePrivateProfileString("General", "CastDetrimental", "false", INIFileName);
+						return;
 					}
 				}
 			}
@@ -417,8 +445,10 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 		if (!_stricmp(Arg1, "debug") || !_stricmp(Arg1, "debugging"))
 		{
 			GetArg(Arg2, Line, 2);
-			if (!strlen(Arg2))
+			if (!strlen(Arg2)) {
 				WriteChatf("%sDebugging: %d", PLUGINMSG, Debugging);
+				return;
+			}
 			if (!IsNumber(Arg2))
 			{
 				if (!_stricmp(Arg2, "on"))
@@ -427,6 +457,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 						Debugging = true;
 						WritePrivateProfileString("General", "Debugging", "true", INIFileName);
 						WriteChatf("%sDebugging: \agOn", PLUGINMSG);
+						return;
 					}	
 				}
 				if (!_stricmp(Arg2, "off"))
@@ -435,21 +466,26 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 						Debugging = false;
 						WritePrivateProfileString("General", "Debugging", "false", INIFileName);
 						WriteChatf("%sDebugging: \arOff", PLUGINMSG);
+						return;
 					}	
 				}
 			} else {
-				if (atoi(Arg2) == 1)
+				if (atoi(Arg2) == 1) {
 					if (!Debugging) {
 						Debugging = true;
 						WritePrivateProfileString("General", "Debugging", "true", INIFileName);
 						WriteChatf("%sDebugging: \agOn", PLUGINMSG);
-					}	
-				if (atoi(Arg2) == 0)
+						return;
+					}
+				}
+				if (atoi(Arg2) == 0) {
 					if (Debugging) {
 						Debugging = false;
 						WritePrivateProfileString("General", "Debugging", "false", INIFileName);
 						WriteChatf("%sDebugging: \arOff", PLUGINMSG);
-					}	
+						return;
+					}
+				}
 			}
 		}
 
@@ -462,9 +498,11 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				MedAt = atoi(Arg2);
 				WritePrivateProfileString("Mana", "MedAt", Arg2, INIFileName);
 				WriteChatf("%s\atMedAt is now: \ap%i", PLUGINMSG, MedAt);
+				return;
 			}
 			else {
 				WriteChatf("%s\atMedAt: \ap%i", PLUGINMSG, MedAt);
+				return;
 			}
 		}
 
@@ -476,9 +514,11 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				MedTill = atoi(Arg2);
 				WritePrivateProfileString("Mana", "MedTill", Arg2, INIFileName);
 				WriteChatf("%s\atMedTill is now: \ap%i", PLUGINMSG, MedTill);
+				return;
 			}
 			else {
 				WriteChatf("%s\atMedTill: \ap%i", PLUGINMSG, MedTill);
+				return;
 			}
 		}
 
@@ -491,9 +531,11 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				HealAt = atoi(Arg2);
 				WritePrivateProfileString("Health", "HealAt", Arg2, INIFileName);
 				WriteChatf("%s\atHealAt is now: \ap%i", PLUGINMSG, HealAt);
+				return;
 			}
 			else {
 				WriteChatf("%s\atHealAt: \ap%i", PLUGINMSG, HealAt);
+				return;
 			}
 		}
 
@@ -505,9 +547,11 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				HealTill = atoi(Arg2);
 				WritePrivateProfileString("Health", "HealTill", Arg2, INIFileName);
 				WriteChatf("%s\atHealTill is now: \ap%i", PLUGINMSG, HealTill);
+				return;
 			}
 			else {
 				WriteChatf("%s\atHealTill: \ap%i", PLUGINMSG, HealTill);
+				return;
 			}
 		}
 		//Endurance updates
@@ -519,9 +563,11 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				MedEndAt = atoi(Arg2);
 				WritePrivateProfileString("Endurance", "MedEndAt", Arg2, INIFileName);
 				WriteChatf("%s\atMedEndAt is now: \ap%i", PLUGINMSG, MedEndAt);
+				return;
 			}
 			else {
 				WriteChatf("%s\atMedEndAt: \ap%i", PLUGINMSG, MedEndAt);
+				return;
 			}
 		}
 
@@ -533,11 +579,15 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				MedEndTill = atoi(Arg2);
 				WritePrivateProfileString("Endurance", "MedEndTill", Arg2, INIFileName);
 				WriteChatf("%s\atMedEndTill is now: \ap%i", PLUGINMSG, MedEndTill);
+				return;
 			}
 			else {
 				WriteChatf("%s\atMedEndTill: \ap%i", PLUGINMSG, MedEndTill);
+				return;
 			}
 		}
+		GetArg(Arg1, Line, 1);
+		WriteChatf("%s \arYou provided an invalid command - %s - is not a valid command!", PLUGINMSG, Arg1);
 	}
 }
 
@@ -587,18 +637,29 @@ void ClearTarget() {
 
 void ListCommands()
 {
-	WriteChatf("%s\atCommands Available", PLUGINMSG);
-	WriteChatf("%s\ay/farm \aw--- \atWill output this help menu", PLUGINMSG);
-	WriteChatf("%s\ar[\a-tMQ2Farm\ar]\ao::\ay/farm on|off \aw--- \atWill turn on|off farming with INI settings.", PLUGINMSG);
-	//WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/farm status \aw--- \atDisplay if the plugin is On/Off.");
+	WriteChatf("%s\ar[\atCommands Available\ar]", PLUGINMSG);
+	WriteChatf("%s\ay/farm help \awor \ay/farm\aw--- \atWill output this help menu", PLUGINMSG);
+	WriteChatf("%s\ay/farm on|off \aw--- \atWill turn on|off farming with INI settings.", PLUGINMSG);
 	WriteChatf("%s\ay/farm radius #### \aw--- \atWill set radius to number provided.", PLUGINMSG);
 	WriteChatf("%s\ay/farm zradius #### \aw--- \atWill set zradius to number provided.", PLUGINMSG);
 	WriteChatf("%s\ay/farm farmmob \"Mob Name Here\" \aw--- \atWill specify a farmmob to farm.", PLUGINMSG);
 	WriteChatf("%s\ay/farm farmmob clear \aw--- \atWill clear the FarmMob and attack anything not on an alertlist.", PLUGINMSG);
 	WriteChatf("%s\ay/farm castdetrimental 1|On 0|Off \aw--- \atWill turn on and off casting of single target detrimental spells.", PLUGINMSG);
+	WriteChatf("%s\ay/farm debug 1|on 0|Off \aw---\atWill turn on and off debugging messages", PLUGINMSG);
+	WriteChatf("%s\ay/farm MedAt \aw---\atWill show you when you will med mana", PLUGINMSG);
+	WriteChatf("%s\ay/farm MedAt #### \aw---\atWill set when you when you will med mana", PLUGINMSG);
+	WriteChatf("%s\ay/farm MedTill \aw---\atWill show you when you will stop medding mana", PLUGINMSG);
+	WriteChatf("%s\ay/farm MedTill ####\aw---\atWill set when you when you will stop medding mana", PLUGINMSG);
+	WriteChatf("%s\ay/farm HealAt \aw---\atWill show you when you will med health", PLUGINMSG);
+	WriteChatf("%s\ay/farm HealAt #### \aw---\atWill show you when you will med health", PLUGINMSG);
+	WriteChatf("%s\ay/farm HealTill \aw---\atWill show you when you will stop medding health", PLUGINMSG);
+	WriteChatf("%s\ay/farm HealTill #### \aw---\atWill set when you when you will med health", PLUGINMSG);
+	WriteChatf("%s\ay/farm MedEndAt \aw---\atWill show you when you will med endurance", PLUGINMSG);
+	WriteChatf("%s\ay/farm MedEndAt #### \aw---\atWill set you when you will med endurance", PLUGINMSG);
+	WriteChatf("%s\ay/farm MedEndTill \aw---\atWill show you when you will stop medding endurance", PLUGINMSG);
+	WriteChatf("%s\ay/farm MedEndTill #### \aw---\atWill set when you will stop medding endurance", PLUGINMSG);
 	WriteChatf("%s\ay/ignorethis \aw--- \atWill temporarily ignore your current target.", PLUGINMSG);
 	WriteChatf("%s\ay/ignorethese \aw--- \atWill temporarily ignore all spawns with this targets clean name.", PLUGINMSG);
-	//WriteChatf("\ar[\a-tMQ2Farm\ar]\ao::\ay/loadignore \aw--- \atWill loadignores from the Ignore_Mobs.ini in the macro folder.");
 }
 
 bool AmIReady()
