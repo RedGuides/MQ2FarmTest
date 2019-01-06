@@ -1,7 +1,9 @@
 //Prototypes
 bool AmIReady();
 bool atob(char x[MAX_STRING]);
+bool DiscReady(PSPELL);
 bool HaveAggro();
+bool IHaveBuff(PSPELL);
 bool MeshLoaded();
 bool NavActive();
 bool NavPaused();
@@ -23,7 +25,6 @@ static PMQPLUGIN FindMQ2NavPlugin();
 void CastDetrimentalSpells();
 void CheckAlias();
 void ClearTarget();
-BOOL DiscReady(PSPELL);
 void DiscSetup();
 void DoINIThings();
 void FarmCommand(PSPAWNINFO pChar, PCHAR Line);
