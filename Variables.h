@@ -16,6 +16,7 @@ char IgnoreINI[MAX_STRING] = { 0 };
 char FarmMob[MAX_STRING] = { 0 };
 char PullAbility[MAX_STRING] = { 0 };
 char searchString[MAX_STRING] = { 0 };
+char ThisINIFileName[MAX_STRING] = "";
 
 DWORD MyTargetID = 0;
 unsigned __int64 DiscLastTimeUsed = GetTickCount64();
@@ -37,9 +38,11 @@ int ZRadius = 0;
 std::vector<PSPELL> SingleDetrimental; //used in combat
 std::vector<PSPELL> AEDetrimental; //used in combat
 std::vector<PSPELL> ToTBeneficial; //used in combat
-
+std::vector<PSPELL> Summons; //summons items
+std::vector<PSPELL> EndRegen; //Endurance Regen Discs
 std::vector<PSPELL> SingleBeneficial; //out of combat
 std::vector<PSPELL> SelfBeneficial; //out of combat
 std::vector<PSPELL> GroupBeneficial; //out of combat
+std::vector<PSPELL> Aura;
 
 //End Variables

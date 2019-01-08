@@ -9,16 +9,18 @@ bool NavActive();
 bool NavPaused();
 bool PathExists(DWORD SpawnID);
 bool SpellsMemorized();
-inline bool InGame();
-inline float PercentMana();
-inline float PercentHealth();
-inline float PercentEndurance();
 
 DWORD getFirstAggroed();
 DWORD SearchSpawns(char szIndex[MAX_STRING]);
 
 float AmFacing(DWORD ID);
 float PathLength(DWORD SpawnID);
+
+inline bool Casting();
+inline bool InGame();
+inline float PercentMana();
+inline float PercentHealth();
+inline float PercentEndurance();
 
 static PMQPLUGIN FindMQ2NavPlugin();
 
@@ -36,6 +38,8 @@ void NavEnd(PSPAWNINFO pChar);
 void NavigateToID(DWORD ID);
 void PluginOn();
 void PluginOff();
+void RestRoutines();
+void SummonThings(std::vector<PSPELL>);
 void UpdateSearchString();
 void UseDiscs();
 void VerifyINI(char ININame[MAX_STRING], char Section[MAX_STRING], char Key[MAX_STRING], char Default[MAX_STRING]);
