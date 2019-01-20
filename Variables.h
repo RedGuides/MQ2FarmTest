@@ -12,13 +12,17 @@ bool useDiscs = true;
 bool PullRequiresLineOfSight = true;
 bool Paused = false;
 
+
 char IgnoreINI[MAX_STRING] = { 0 };
 char FarmMob[MAX_STRING] = { 0 };
 char PullAbility[MAX_STRING] = { 0 };
 char searchString[MAX_STRING] = { 0 };
 char ThisINIFileName[MAX_STRING] = "";
+char IgnoresFileName[MAX_STRING] = "";
+
 
 DWORD MyTargetID = 0;
+unsigned __int64 CastLastTimeUsed = GetTickCount64();
 unsigned __int64 DiscLastTimeUsed = GetTickCount64();
 int HealAt = 0;
 int HealTill = 0;
@@ -30,7 +34,7 @@ int MedTill = 0;
 int CampRadius = 0;
 int GemIndex = 0;
 int PullAbilityRange = 0;
-int PulseDelay = 30;
+int PulseDelay = 20;
 int Pulse = 0;
 int Radius = 0;
 int ZRadius = 0;

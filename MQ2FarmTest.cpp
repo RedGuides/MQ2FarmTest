@@ -35,6 +35,20 @@
 						   - INI Name now updated when the farm command is used for anything to ensure that the proper file is being written to.
 						   - Added in the casting of Aura Discs and Endurance Regen Discs for use out of combat.
 						   - Refined ActiveDisc detections to eliminate trying to use a disc when there is already an active disc, but allow the use of combat abilities unhindered.
+ Chatwiththisname 1/20/2019 - Added the use of the FarmMobIgnored.ini file in the macro folder for the global ignores
+							  so players didn't need to reinvent the wheel and could use the existing ignores file.
+							- Added group health mana and endurance checks so you can now have the merc tag along
+							  without worry of running them out of mana.
+							- Reduced the delay between pulses by 1/3rd
+							- Nav will now refresh destination if target is moving while navigating to the selected spawn.
+							- Made some adjustments to stopping distance to prevent "You are to far away" issues.
+							- Discs now verify target is in range before attempting to use if you have a target.
+							- Fixed a crash that occured if no valid spawns were found.
+							- TODO: Add the /permignore command to replicate the usage in the macro
+							- TODO: Fix spell casting...yes, really...maybe....I'm not sure.
+							- TODO: Change the distance checks for NavigateToID(DWORD ID) to use Get3DDistance function instead of GetDistance
+							- TODO: Check for dead group members
+							- TODO: Check for dead mercenaries and handle it appropriately. (Gah, window access?)
 
 
 [DiscRemove]
@@ -83,7 +97,9 @@ PLUGIN_API VOID InitializePlugin(VOID)
 	AddCommand("/farm", FarmCommand);
 	AddCommand("/ignorethese", IgnoreTheseCommand);
 	AddCommand("/ignorethis", IgnoreThisCommand);
+	//AddCommand("/permignore", PermIgnoreCoammnd);
 	WriteChatf("%s\aw- \ag%s", PLUGINMSG, VERSION);
+	sprintf_s(IgnoresFileName, MAX_STRING, "%s\\Macros\\FarmMobIgnores.ini", gszINIPath);
 
 }
 
@@ -646,34 +662,52 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 //Example: SearchSpawns("npc noalert 1 targetable radius 100 zradius 50");
 DWORD SearchSpawns(char szIndex[MAX_STRING])
 {
+	#define pZone ((PZONEINFO)pZoneInfo)
 	double fShortest = 9999.0f;
 	PSPAWNINFO sShortest;
 	SEARCHSPAWN ssSpawn;
 	ClearSearchSpawn(&ssSpawn);
 	ssSpawn.FRadius = 999999.0f;
 	ParseSearchSpawn(szIndex, &ssSpawn);
+	bool bFound = false;
+	char temp[MAX_STRING] = "";
+	char IgnoredMobList[MAX_STRING] = "";
+	char IgnoredMobList1[MAX_STRING] = "";
+	VerifyINI(pZone->ShortName, "Ignored", "|", IgnoresFileName);
+	GetPrivateProfileString(pZone->ShortName, "Ignored", "|", IgnoredMobList, MAX_STRING, IgnoresFileName);
+	VerifyINI(pZone->ShortName, "Ignored1", "|", IgnoresFileName);
+	GetPrivateProfileString(pZone->ShortName, "Ignored1", "|", IgnoredMobList1, MAX_STRING, IgnoresFileName);
 	for (unsigned long N = 0; N < gSpawnCount; N++)
 	{
 		if (EQP_DistArray[N].Value.Float > ssSpawn.FRadius && !ssSpawn.bKnownLocation || N > 50)
 			break;
-		if (SpawnMatchesSearch(&ssSpawn, (PSPAWNINFO)pCharSpawn, (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr))
-		{
-			PSPAWNINFO pSpawn = (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr;
-			if (strlen(pSpawn->Lastname)) continue;
-			if (PathExists(pSpawn->SpawnID) && (int)PathLength(pSpawn->SpawnID) >= (int)GetDistance3D(GetCharInfo()->pSpawn->X, GetCharInfo()->pSpawn->Y, GetCharInfo()->pSpawn->Z, pSpawn->X, pSpawn->Y, pSpawn->Z)) {
-
-				if (fShortest > PathLength(pSpawn->SpawnID)) {
-					fShortest = PathLength(pSpawn->SpawnID);
-					sShortest = pSpawn;
+		if (SpawnMatchesSearch(&ssSpawn, (PSPAWNINFO)pCharSpawn, (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr)) {
+			if (PSPAWNINFO pSpawn = (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr) {
+				if (strlen(pSpawn->Lastname))
+					continue;
+				sprintf_s(temp, MAX_STRING, "|%s|", pSpawn->DisplayedName);
+				if (strstr(IgnoredMobList, temp)) {
+					if (Debugging) WriteChatf("\ar[\a-t%u\ar]\ap%s was on the ignore list", pSpawn->SpawnID, temp);
+					continue;
+				}
+				if (strstr(IgnoredMobList1, temp)) {
+					if (Debugging) WriteChatf("\ar[\a-t%u\ar]\ap%s was on the ignore list", pSpawn->SpawnID, temp);
+					continue;
+				}
+				if (PathExists(pSpawn->SpawnID) && (int)PathLength(pSpawn->SpawnID) >= (int)GetDistance3D(GetCharInfo()->pSpawn->X, GetCharInfo()->pSpawn->Y, GetCharInfo()->pSpawn->Z, pSpawn->X, pSpawn->Y, pSpawn->Z)) {
+					if (fShortest > PathLength(pSpawn->SpawnID)) {
+						fShortest = PathLength(pSpawn->SpawnID);
+						sShortest = pSpawn;
+						if (!bFound) bFound = true;
+					}
 				}
 			}
 		}
 	}
-	if (sShortest) {
-		if (GetSpawnByID(sShortest->SpawnID)) {
+	#undef pZone
+	if (bFound) {
 			WriteChatf("%s\ar[%u]: %s is my Target", PLUGINMSG, sShortest->SpawnID, sShortest->Name);
 			return sShortest->SpawnID;
-		}
 	}
 	if (GetCharInfo()->pSpawn->StandState == STANDSTATE_STAND && !Casting())
 		EzCommand("/sit");
@@ -716,61 +750,167 @@ void ListCommands()
 
 bool AmIReady()
 {
-	//Start Medding Endurance Here.
-	if (!GettingEndurance && PercentEndurance() < MedEndAt) {
+	if (!InGame()) return false;
+	if (GROUPINFO *myGroup = GetCharInfo()->pGroupInfo) {
+		//Group Endurance Check
 		if (!GettingEndurance) {
-			GettingEndurance = true;
-			WriteChatf("%s\arNeed to med endurance.", PLUGINMSG);
+			for (int i = 0; i < 6; i++) {
+				if (myGroup->pMember[i]) {
+					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+						if (PercentEndurance(pSpawn) < MedEndAt) {
+							GettingEndurance = true;
+							WriteChatf("%s\ar%s needs to med Endurance.", PLUGINMSG, pSpawn->Name);
+							return false;
+						}
+					}
+				}
+			}
 		}
-		return false;
-	}
-
-	if (GettingEndurance && PercentEndurance() < MedEndTill) {
-		return false;
-	}
-	else {
-		if (GettingEndurance) {
-			WriteChatf("%s\agDone medding Endurance.", PLUGINMSG);
-			GettingEndurance = false;
+		else if (GettingEndurance) {
+			bool stillMedding = false;
+			for (int i = 0; i < 6; i++) {
+				if (myGroup->pMember[i]) {
+					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+						if (PercentEndurance(pSpawn) < MedEndTill) {
+							stillMedding = true;
+						}
+					}
+				}
+			}
+			if (stillMedding) {
+				return false;
+			}
+			else {
+				WriteChatf("%s\agDone medding Endurance", PLUGINMSG);
+				GettingEndurance = false;
+			}
 		}
-	}
-	//GetCharInfo()->pGroupInfo->pMember[1]
 
-	//Starting Medding Mana here. 
-	if (!GettingMana && PercentMana() < MedAt) {
+		//Group Mana Check
 		if (!GettingMana) {
-			WriteChatf("%s\arNeed to med Mana!", PLUGINMSG);
-			GettingMana = true;
+			for (int i = 0; i < 6; i++) {
+				if (myGroup->pMember[i]) {
+					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+						if (PercentMana(pSpawn) < MedAt) {
+							GettingMana = true;
+							WriteChatf("%s\ar%s needs to med Mana.", PLUGINMSG, pSpawn->Name);
+							return false;
+						}
+					}
+				}
+			}
 		}
-		return false;
-	}
-
-	if (GettingMana && PercentMana() < MedTill) {
-		//WriteChatf("%f", PercentMana());
-		return false;
-	}
-	else {
-		if (GettingMana) {
-			WriteChatf("%s\agDone medding Mana!", PLUGINMSG);
-			GettingMana = false;
+		else if (GettingMana) {
+			bool stillMedding = false;
+			for (int i = 0; i < 6; i++) {
+				if (myGroup->pMember[i]) {
+					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+						if (PercentMana(pSpawn) < MedTill) {
+							stillMedding = true;
+						}
+					}
+				}
+			}
+			if (stillMedding) {
+				return false;
+			}
+			else {
+				WriteChatf("%s\agDone medding Mana", PLUGINMSG);
+				GettingMana = false;
+			}
 		}
-	}
-
-	//Start medding health here.
-	if (!GettingHealth && PercentHealth() < HealAt) {
+		//Group Health Check
 		if (!GettingHealth) {
-			WriteChatf("%s\arNeed to med Health!", PLUGINMSG);
-			GettingHealth = true;
+			for (int i = 0; i < 6; i++) {
+				if (myGroup->pMember[i]) {
+					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+						if (PercentHealth(pSpawn) < HealAt) {
+							GettingHealth = true;
+							WriteChatf("%s\ar%s needs to med Health.", PLUGINMSG, pSpawn->Name);
+							return false;
+						}
+					}
+				}
+			}
 		}
-		return false;
-	}
-	if (GettingHealth && PercentHealth() < HealTill) {
-		return false;
+		else if (GettingHealth) {
+			bool stillMedding = false;
+			for (int i = 0; i < 6; i++) {
+				if (myGroup->pMember[i]) {
+					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+						if (PercentHealth(pSpawn) < HealTill) {
+							stillMedding = true;
+						}
+					}
+				}
+			}
+			if (stillMedding) {
+				return false;
+			}
+			else {
+				WriteChatf("%s\agDone medding Health", PLUGINMSG);
+				GettingHealth = false;
+			}
+		}
 	}
 	else {
-		if (GettingHealth) {
-			WriteChatf("%s\agDone medding health!", PLUGINMSG);
-			GettingHealth = false;
+		//Start Medding Endurance Here.
+		PSPAWNINFO me = GetCharInfo()->pSpawn;
+		if (!GettingEndurance && PercentEndurance(me) < MedEndAt) {
+			if (!GettingEndurance) {
+				GettingEndurance = true;
+				WriteChatf("%s\arNeed to med endurance.", PLUGINMSG);
+			}
+			return false;
+		}
+
+		if (GettingEndurance && PercentEndurance(me) < MedEndTill) {
+			return false;
+		}
+		else {
+			if (GettingEndurance) {
+				WriteChatf("%s\agDone medding Endurance.", PLUGINMSG);
+				GettingEndurance = false;
+			}
+		}
+		//GetCharInfo()->pGroupInfo->pMember[1]
+
+		//Starting Medding Mana here. 
+		if (!GettingMana && PercentMana(me) < MedAt) {
+			if (!GettingMana) {
+				WriteChatf("%s\arNeed to med Mana!", PLUGINMSG);
+				GettingMana = true;
+			}
+			return false;
+		}
+
+		if (GettingMana && PercentMana(me) < MedTill) {
+			//WriteChatf("%f", PercentMana());
+			return false;
+		}
+		else {
+			if (GettingMana) {
+				WriteChatf("%s\agDone medding Mana!", PLUGINMSG);
+				GettingMana = false;
+			}
+		}
+
+		//Start medding health here.
+		if (!GettingHealth && PercentHealth(me) < HealAt) {
+			if (!GettingHealth) {
+				WriteChatf("%s\arNeed to med Health!", PLUGINMSG);
+				GettingHealth = true;
+			}
+			return false;
+		}
+		if (GettingHealth && PercentHealth(me) < HealTill) {
+			return false;
+		}
+		else {
+			if (GettingHealth) {
+				WriteChatf("%s\agDone medding health!", PLUGINMSG);
+				GettingHealth = false;
+			}
 		}
 	}
 	return true;
@@ -837,6 +977,7 @@ void CastDetrimentalSpells()
 					if (pTarget && GetDistance(GetCharInfo()->pSpawn, (PSPAWNINFO)pTarget) < spell->Range) {
 						WriteChatf("%s\arCasting \a-t----> \ap%s \ayfrom Gem %d", PLUGINMSG, spell->Name, GemIndex + 1);
 						EzCommand(castcommand);
+						CastLastTimeUsed = GetTickCount64();
 					}
 					else {
 						if (Debugging) WriteChatf("Target not in range, or no target.");
@@ -928,50 +1069,54 @@ bool SpellsMemorized()
 	return false;
 }
 
-inline float PercentMana()
+inline float PercentMana(PSPAWNINFO &pSpawn)
 {
-	return (float)GetCharInfo()->pSpawn->ManaCurrent / (float)GetCharInfo()->pSpawn->ManaMax*100.0f;
+	return (float)pSpawn->ManaCurrent / (float)pSpawn->ManaMax * 100.0f;
 }
 
-inline float PercentHealth()
+inline float PercentHealth(PSPAWNINFO &pSpawn)
 {
-	return (float)GetCharInfo()->pSpawn->HPCurrent / (float)GetCharInfo()->pSpawn->HPMax * 100.0f;
+	return (float)pSpawn->HPCurrent / (float)pSpawn->HPMax * 100.0f;
 }
 
-inline float PercentEndurance()
+inline float PercentEndurance(PSPAWNINFO &pSpawn)
 {
-	return (float)GetCharInfo()->pSpawn->EnduranceCurrent / (float)GetCharInfo()->pSpawn->EnduranceMax * 100.0f;
+	return (float)pSpawn->EnduranceCurrent / (float)pSpawn->EnduranceMax * 100.0f;
 }
 
 void NavigateToID(DWORD ID) {
-	PSPAWNINFO Mob = (PSPAWNINFO)GetSpawnByID(ID);
-	if (!Mob) return;
-	CHAR szNavInfo[32];
-	sprintf_s(szNavInfo, 32, "%u", ID);
-	if (Mob && (!LineOfSight(GetCharInfo()->pSpawn, Mob) || GetDistance(GetCharInfo()->pSpawn, Mob) > 20)) {
-		if (!NavActive()) {
-			if (!GetCharInfo()->pSpawn->CastingData.IsCasting()) NavCommand(GetCharInfo()->pSpawn, szNavInfo);
+	if (CastLastTimeUsed >= GetTickCount64()) return;
+	if (PSPAWNINFO Mob = (PSPAWNINFO)GetSpawnByID(ID)) {
+		CHAR szNavInfo[32];
+		sprintf_s(szNavInfo, 32, "%u", ID);
+		if (Mob && (!LineOfSight(GetCharInfo()->pSpawn, Mob) || GetDistance(GetCharInfo()->pSpawn, Mob) > 15)) {
+			if (!NavActive() || fabs(Mob->SpeedRun) > 0.0f) {
+				if (!Casting())
+					NavCommand(GetCharInfo()->pSpawn, szNavInfo);
+			}
+		}
+		if (LineOfSight(GetCharInfo()->pSpawn, Mob) && GetDistance(GetCharInfo()->pSpawn, Mob) < 75) {
+			if (Mob && pTarget && ((PSPAWNINFO)pTarget)->SpawnID != Mob->SpawnID || !pTarget) {
+				TargetIt(Mob);
+			}
+		}
+		if (LineOfSight(GetCharInfo()->pSpawn, Mob) && GetDistance(GetCharInfo()->pSpawn, Mob) < 12) {
+			if (NavActive()) 
+				NavEnd(GetCharInfo()->pSpawn);
+			if (GetCharInfo()->pSpawn->StandState == STANDSTATE_SIT)
+				EzCommand("/stand");
+			if (AmFacing(Mob->SpawnID) > 30) 
+				Face(GetCharInfo()->pSpawn, "fast");
+		}
+		if (Mob && pTarget) {
+			if (useDiscs) UseDiscs();
+			if (CastDetrimental) CastDetrimentalSpells();
+			if (*EQADDR_ATTACK) return;
+			*EQADDR_ATTACK = 00000001;
+			EzCommand("/pet attack");
+			EzCommand("/pet swarm");
 
 		}
-	}
-	if (LineOfSight(GetCharInfo()->pSpawn, Mob) && GetDistance(GetCharInfo()->pSpawn, Mob) < 20) {
-		if (NavActive()) NavEnd(GetCharInfo()->pSpawn);
-		if (Mob && pTarget && ((PSPAWNINFO)pTarget)->SpawnID != Mob->SpawnID || !pTarget) {
-			TargetIt(Mob);
-		}
-		if (GetCharInfo()->pSpawn->StandState == STANDSTATE_SIT)
-			EzCommand("/stand");
-		//if (Debugging) WriteChatf("AmFacing() returned: %f", AmFacing(Mob->SpawnID));
-		if (AmFacing(Mob->SpawnID) > 30) Face(GetCharInfo()->pSpawn, "fast");
-	}
-	if (Mob && pTarget) {
-		if (useDiscs) UseDiscs();
-		if (CastDetrimental) CastDetrimentalSpells();
-		if (*EQADDR_ATTACK) return;
-		*EQADDR_ATTACK = 00000001;
-		EzCommand("/pet attack");
-		EzCommand("/pet swarm");
-
 	}
 }
 
@@ -1277,23 +1422,29 @@ bool DiscReady(PSPELL pSpell)
 			}
 		}
 		//If I have enough mana and endurance (Never know, might be mana requirements lol).
-		if (GetCharInfo()->pSpawn->ManaCurrent >= (int)pSpell->ManaCost && GetCharInfo()->pSpawn->EnduranceCurrent >= (int)pSpell->EnduranceCost) {
+		PSPAWNINFO me = GetCharInfo()->pSpawn;
+		if (me->ManaCurrent >= (int)pSpell->ManaCost && me->EnduranceCurrent >= (int)pSpell->EnduranceCost) {
+			if (pTarget && me) {
+				if (GetDistance(me, (PSPAWNINFO)pTarget) > pSpell->Range) {
+					return false;
+				}
+			}
 			DWORD ReqID = pSpell->CasterRequirementID;
 			if (ReqID == 518) {
 				//Requires under 90% hitpoints
-				if (PercentHealth() > 89) return false;
+				if (PercentHealth(me) > 89) return false;
 			}
 			else if (ReqID == 825) {
 				//Requires under 21% Endurance
-				if (PercentEndurance() > 20) return false;
+				if (PercentEndurance(me) > 20) return false;
 			}
 			else if (ReqID == 826) {
 				//Requires under 25% Endurance
-				if (PercentEndurance() > 24) return false;
+				if (PercentEndurance(me) > 24) return false;
 			}
 			else if (ReqID == 827) {
 				//Requires under 29% Endurance
-				if (PercentEndurance() > 28) return false;
+				if (PercentEndurance(me) > 28) return false;
 			}
 			for (int i = 0; i < 4; i++) {
 				if (pSpell->ReagentCount[i] > 0) {
@@ -1375,6 +1526,11 @@ inline bool Casting() {
 	return GetCharInfo()->pSpawn->CastingData.IsCasting();
 }
 
+//NotUsed - Complete TODO!
+void PermIgnoreCommand(PSPAWNINFO pChar) {
+
+}
+
 
 //NotUsed
 void SummonThings(vector<PSPELL> spellList) {
@@ -1387,4 +1543,3 @@ void SummonThings(vector<PSPELL> spellList) {
 		}
 	}
 }
-

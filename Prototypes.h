@@ -18,9 +18,9 @@ float PathLength(DWORD SpawnID);
 
 inline bool Casting();
 inline bool InGame();
-inline float PercentMana();
-inline float PercentHealth();
-inline float PercentEndurance();
+inline float PercentMana(PSPAWNINFO &pSpawn);
+inline float PercentHealth(PSPAWNINFO &pSpawn);
+inline float PercentEndurance(PSPAWNINFO &pSpawn);
 
 static PMQPLUGIN FindMQ2NavPlugin();
 
@@ -36,6 +36,7 @@ void ListCommands();
 void NavCommand(PSPAWNINFO pChar, PCHAR szLine);
 void NavEnd(PSPAWNINFO pChar);
 void NavigateToID(DWORD ID);
+void PermIgnoreCommand(PSPAWNINFO pchar);
 void PluginOn();
 void PluginOff();
 void RestRoutines();
