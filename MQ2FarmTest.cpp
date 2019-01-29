@@ -44,11 +44,28 @@
 							- Made some adjustments to stopping distance to prevent "You are to far away" issues.
 							- Discs now verify target is in range before attempting to use if you have a target.
 							- Fixed a crash that occured if no valid spawns were found.
+ Chatwiththisname 1/22/2019 - CHANGE: Fixed a typo in setting the ignore file, changed from FarmMobIgnores.ini to FarmMobIgnored.ini
+ Chatwiththisname 1/28/2019 - CHANGE: If the pSpawn has no ManaMax, lie and say they're at 100% mana, even if they don't have a mana bar (rogue merc fix)
+							- CHANGE: Added a delay after a disc is used before sitting again to avoid interupting discs during downtimes
+							- CHANGE: Tell user about the "/farm help" command on initilize.
+							- CHANGE: "/farm off" doesn't turn off attack if it's on? Bug or feature? Check for aggro, if none, turn off
+							  attack, otherwise leave it on?
+							- CHANGE: Add a message to let the user know there are no valid targets nearby and you are sitting while waiting for more.
+ Chatwiththisname 1/29/2019 - CHANGE: Changed the distance checks to Distance3DToSpawn function instead of GetDistance
+							- CHANGE: No longer checking Health/Mana/Endurance for you or group while you have Aggro.
+							- CHANGE: Adjust a "radius" circle on MQ2Map to depict the Radius engage
+							- CHANGE: Added /farm command param "ShowSettings" to display all valid settings.
+
 							- TODO: Add the /permignore command to replicate the usage in the macro
 							- TODO: Fix spell casting...yes, really...maybe....I'm not sure.
-							- TODO: Change the distance checks for NavigateToID(DWORD ID) to use Get3DDistance function instead of GetDistance
 							- TODO: Check for dead group members
 							- TODO: Check for dead mercenaries and handle it appropriately. (Gah, window access?)
+							- POSSIBLE: Debate with yourself if you should shorten the ListCommands() function to be less precise
+							  to facilitate a more compressed look. (Probably not).
+							- TODO: Give radius a purpose. Set it so that where you issue the /farm on command is the anchor point for all potential
+							  target consideration, and the user should not select entities outside of that circle when farming.
+
+
 
 
 [DiscRemove]
@@ -93,13 +110,15 @@ PLUGIN_API VOID InitializePlugin(VOID)
 	pFarmType = new MQ2FarmType;
 	if (InGame()) {
 		sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gszINIPath, GetCharInfo()->Name);
+		DoINIThings();
 	}
 	AddCommand("/farm", FarmCommand);
 	AddCommand("/ignorethese", IgnoreTheseCommand);
 	AddCommand("/ignorethis", IgnoreThisCommand);
-	//AddCommand("/permignore", PermIgnoreCoammnd);
+	AddCommand("/permignore", PermIgnoreCommand);
 	WriteChatf("%s\aw- \ag%s", PLUGINMSG, VERSION);
-	sprintf_s(IgnoresFileName, MAX_STRING, "%s\\Macros\\FarmMobIgnores.ini", gszINIPath);
+	WriteChatf("%s \ao/farm help \aw- \ay For a list of commands!", PLUGINMSG);
+	sprintf_s(IgnoresFileName, MAX_STRING, "%s\\Macros\\FarmMobIgnored.ini", gszINIPath);
 
 }
 
@@ -139,7 +158,7 @@ PLUGIN_API VOID OnPulse(VOID)
 		if (!AmIReady()) {
 			if (NavActive())
 				NavEnd(GetCharInfo()->pSpawn);
-			if (GetCharInfo()->pSpawn->StandState == STANDSTATE_STAND && !Casting())
+			if (GetCharInfo()->pSpawn->StandState == STANDSTATE_STAND && !Casting() && DiscLastTimeUsed < GetTickCount64())
 				EzCommand("/sit");
 			pulsing = false;
 			return;
@@ -271,6 +290,10 @@ void DoINIThings()
 	else {
 		Radius = atoi(temp);
 	}
+	sprintf_s(temp, MAX_STRING, "/squelch /mapfilter CastRadius color 0 0 255");
+	EzCommand(temp);
+	sprintf_s(temp, MAX_STRING, "/squelch /mapfilter CastRadius %i", Radius);
+	EzCommand(temp);
 	if (Debugging) WriteChatf("\ayRadius: \at%d", Radius);
 
 	//Check for INI entry for Key PullAbility in Pull section.
@@ -405,6 +428,9 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				Radius = atoi(Arg2);
 				WritePrivateProfileString("Pull", "Radius", Arg2, ThisINIFileName);
 				sprintf_s(searchString, MAX_STRING, "npc noalert 1 radius %i zradius %i targetable %s", Radius, ZRadius, FarmMob);
+				CHAR temp[MAX_STRING] = "";
+				sprintf_s(temp, MAX_STRING, "/squelch /mapfilter CastRadius %i", Radius);
+				EzCommand(temp);
 				WriteChatf("%s\atRadius is now: \ap%i", PLUGINMSG, Radius);
 				return;
 			}
@@ -652,6 +678,11 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				return;
 			}
 		}
+		if (!_stricmp(Arg1, "ShowSettings"))
+		{
+			ShowSettings();
+			return;
+		}
 		GetArg(Arg1, Line, 1);
 		WriteChatf("%s \arYou provided an invalid command - %s - is not a valid command!", PLUGINMSG, Arg1);
 	}
@@ -694,7 +725,7 @@ DWORD SearchSpawns(char szIndex[MAX_STRING])
 					if (Debugging) WriteChatf("\ar[\a-t%u\ar]\ap%s was on the ignore list", pSpawn->SpawnID, temp);
 					continue;
 				}
-				if (PathExists(pSpawn->SpawnID) && (int)PathLength(pSpawn->SpawnID) >= (int)GetDistance3D(GetCharInfo()->pSpawn->X, GetCharInfo()->pSpawn->Y, GetCharInfo()->pSpawn->Z, pSpawn->X, pSpawn->Y, pSpawn->Z)) {
+				if (PathExists(pSpawn->SpawnID) && (int)PathLength(pSpawn->SpawnID) >= (int)Distance3DToSpawn(GetCharInfo()->pSpawn, pSpawn)) {
 					if (fShortest > PathLength(pSpawn->SpawnID)) {
 						fShortest = PathLength(pSpawn->SpawnID);
 						sShortest = pSpawn;
@@ -709,8 +740,10 @@ DWORD SearchSpawns(char szIndex[MAX_STRING])
 			WriteChatf("%s\ar[%u]: %s is my Target", PLUGINMSG, sShortest->SpawnID, sShortest->Name);
 			return sShortest->SpawnID;
 	}
-	if (GetCharInfo()->pSpawn->StandState == STANDSTATE_STAND && !Casting())
+	if (GetCharInfo()->pSpawn->StandState == STANDSTATE_STAND && !Casting() && DiscLastTimeUsed < GetTickCount64()) {
+		WriteChatf("%s\arCharacter is resting while waiting for valid targets or aggro.", PLUGINMSG);
 		EzCommand("/sit");
+	}
 	return false;
 }
 
@@ -751,6 +784,7 @@ void ListCommands()
 bool AmIReady()
 {
 	if (!InGame()) return false;
+	if (HaveAggro()) return false;
 	if (GROUPINFO *myGroup = GetCharInfo()->pGroupInfo) {
 		//Group Endurance Check
 		if (!GettingEndurance) {
@@ -974,7 +1008,7 @@ void CastDetrimentalSpells()
 				string s = to_string(GemIndex + 1);
 				strcat_s(castcommand, MAX_STRING, s.c_str());
 				if (GetCharInfo()->pSpawn->ManaCurrent > (int)spell->ManaCost) {
-					if (pTarget && GetDistance(GetCharInfo()->pSpawn, (PSPAWNINFO)pTarget) < spell->Range) {
+					if (pTarget && Distance3DToSpawn(GetCharInfo()->pSpawn, (PSPAWNINFO)pTarget) < spell->Range) {
 						WriteChatf("%s\arCasting \a-t----> \ap%s \ayfrom Gem %d", PLUGINMSG, spell->Name, GemIndex + 1);
 						EzCommand(castcommand);
 						CastLastTimeUsed = GetTickCount64();
@@ -1042,6 +1076,8 @@ void PluginOff()
 	MyTargetID = 0;
 	activated = false;
 	NavEnd(GetCharInfo()->pSpawn);
+	if (!HaveAggro() && *EQADDR_ATTACK)
+		*EQADDR_ATTACK = 00000000;
 	WriteChatf("%s\arDeactivated", PLUGINMSG);
 }
 
@@ -1071,6 +1107,7 @@ bool SpellsMemorized()
 
 inline float PercentMana(PSPAWNINFO &pSpawn)
 {
+	if ((float)pSpawn->ManaMax <= 0) return 100.0f;
 	return (float)pSpawn->ManaCurrent / (float)pSpawn->ManaMax * 100.0f;
 }
 
@@ -1089,18 +1126,18 @@ void NavigateToID(DWORD ID) {
 	if (PSPAWNINFO Mob = (PSPAWNINFO)GetSpawnByID(ID)) {
 		CHAR szNavInfo[32];
 		sprintf_s(szNavInfo, 32, "%u", ID);
-		if (Mob && (!LineOfSight(GetCharInfo()->pSpawn, Mob) || GetDistance(GetCharInfo()->pSpawn, Mob) > 15)) {
+		if (Mob && (!LineOfSight(GetCharInfo()->pSpawn, Mob) || Distance3DToSpawn(GetCharInfo()->pSpawn, Mob) > 15)) {
 			if (!NavActive() || fabs(Mob->SpeedRun) > 0.0f) {
 				if (!Casting())
 					NavCommand(GetCharInfo()->pSpawn, szNavInfo);
 			}
 		}
-		if (LineOfSight(GetCharInfo()->pSpawn, Mob) && GetDistance(GetCharInfo()->pSpawn, Mob) < 75) {
+		if (LineOfSight(GetCharInfo()->pSpawn, Mob) && Distance3DToSpawn(GetCharInfo()->pSpawn, Mob) < 75) {
 			if (Mob && pTarget && ((PSPAWNINFO)pTarget)->SpawnID != Mob->SpawnID || !pTarget) {
 				TargetIt(Mob);
 			}
 		}
-		if (LineOfSight(GetCharInfo()->pSpawn, Mob) && GetDistance(GetCharInfo()->pSpawn, Mob) < 12) {
+		if (LineOfSight(GetCharInfo()->pSpawn, Mob) && Distance3DToSpawn(GetCharInfo()->pSpawn, Mob) < 12) {
 			if (NavActive()) 
 				NavEnd(GetCharInfo()->pSpawn);
 			if (GetCharInfo()->pSpawn->StandState == STANDSTATE_SIT)
@@ -1425,7 +1462,7 @@ bool DiscReady(PSPELL pSpell)
 		PSPAWNINFO me = GetCharInfo()->pSpawn;
 		if (me->ManaCurrent >= (int)pSpell->ManaCost && me->EnduranceCurrent >= (int)pSpell->EnduranceCost) {
 			if (pTarget && me) {
-				if (GetDistance(me, (PSPAWNINFO)pTarget) > pSpell->Range) {
+				if (Distance3DToSpawn(me, (PSPAWNINFO)pTarget) > pSpell->Range) {
 					return false;
 				}
 			}
@@ -1527,7 +1564,7 @@ inline bool Casting() {
 }
 
 //NotUsed - Complete TODO!
-void PermIgnoreCommand(PSPAWNINFO pChar) {
+void PermIgnoreCommand(PSPAWNINFO pChar, PCHAR szline) {
 
 }
 
@@ -1542,4 +1579,28 @@ void SummonThings(vector<PSPELL> spellList) {
 			}
 		}
 	}
+}
+
+void ShowSettings() {
+	//General Section
+	WriteChatf("%s\ar[\a-tGeneral\ar]", PLUGINMSG);
+	WriteChatf("%s\ayDebugging\ar:%s", PLUGINMSG, Debugging ? "\agTRUE" : "\arFALSE");
+	WriteChatf("%s\ayCastDetrimental\ar:%s", PLUGINMSG, CastDetrimental ? "\agTRUE" : "\arFALSE");
+	//Pull Section
+	WriteChatf("%s\ar[\a-tPull\ar]", PLUGINMSG);
+	WriteChatf("%s\ayRadius\ar:\ag%i", PLUGINMSG, Radius);
+	WriteChatf("%s\ayZRadius\ar:\ag%i", PLUGINMSG, ZRadius);
+	WriteChatf("%s\ayPullAbility\ar: NOT USED CURRENTLY!", PLUGINMSG);
+	//Health Section
+	WriteChatf("%s\ar[\a-tHealth\ar]",PLUGINMSG);
+	WriteChatf("%s\ayHealAt\ar:\ag%i", PLUGINMSG, HealAt);
+	WriteChatf("%s\ayHealTill\ar:\ag%i", PLUGINMSG, HealTill);
+	//Mana Section
+	WriteChatf("%s\ar[\a-tMana\ar]", PLUGINMSG);
+	WriteChatf("%s\ayMedAt\ar:\ag%i", PLUGINMSG, MedAt);
+	WriteChatf("%s\ayMedTill\ar:\ag%i", PLUGINMSG, MedTill);
+	//Endurance Section
+	WriteChatf("%s\ar[\a-tEndurance\ar]", PLUGINMSG);
+	WriteChatf("%s\ayMedEndAt\ar:\ag%i", PLUGINMSG, MedEndAt);
+	WriteChatf("%s\ayMedEndTill\ar:\ag%i", PLUGINMSG, MedEndTill);
 }
