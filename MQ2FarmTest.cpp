@@ -55,18 +55,14 @@
 							- CHANGE: No longer checking Health/Mana/Endurance for you or group while you have Aggro.
 							- CHANGE: Adjust a "radius" circle on MQ2Map to depict the Radius engage
 							- CHANGE: Added /farm command param "ShowSettings" to display all valid settings.
-
-							- TODO: Add the /permignore command to replicate the usage in the macro
-							- TODO: Fix spell casting...yes, really...maybe....I'm not sure.
-							- TODO: Check for dead group members
-							- TODO: Check for dead mercenaries and handle it appropriately. (Gah, window access?)
-							- POSSIBLE: Debate with yourself if you should shorten the ListCommands() function to be less precise
-							  to facilitate a more compressed look. (Probably not).
-							- TODO: Give radius a purpose. Set it so that where you issue the /farm on command is the anchor point for all potential
+							- CHANGE: Gave radius a purpose. Set it so that where you issue the /farm on command is the anchor point for all potential
 							  target consideration, and the user should not select entities outside of that circle when farming.
+							- CHANGE: Added the /permignore command to replicate the usage in the macro
+							- CHANGE: Added DeathChecks and Missing Group members checks. These are the same thing as far as the plugin is concerned.
+							- CHANGE: DeathCheck includes mercenary's correctly. Not yet handling reviving them.
 
-
-
+							- TODO: Fix spell casting...yes, really...maybe....I'm not sure.
+							- TODO: Handle Dead mercs appropriately. (Gah, window access?)
 
 [DiscRemove]
 DiscRemove1=Hiatus
@@ -86,7 +82,7 @@ DiscAdd8=Axe of the Demolisher
 
 
 #define PLUGIN_NAME "MQ2FarmTest"
-#define VERSION "0.2"
+#define VERSION "0.3"
 #define PLUGINMSG "\ar[\a-tMQ2Farm\ar]\ao:: "
 #include "../MQ2Plugin.h"
 #include "Prototypes.h"
@@ -427,7 +423,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 			{
 				Radius = atoi(Arg2);
 				WritePrivateProfileString("Pull", "Radius", Arg2, ThisINIFileName);
-				sprintf_s(searchString, MAX_STRING, "npc noalert 1 radius %i zradius %i targetable %s", Radius, ZRadius, FarmMob);
+				UpdateSearchString();
 				CHAR temp[MAX_STRING] = "";
 				sprintf_s(temp, MAX_STRING, "/squelch /mapfilter CastRadius %i", Radius);
 				EzCommand(temp);
@@ -447,7 +443,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 			{
 				ZRadius = atoi(Arg2);
 				WritePrivateProfileString("Pull", "ZRadius", Arg2, ThisINIFileName);
-				sprintf_s(searchString, MAX_STRING, "npc noalert 1 radius %i zradius %i targetable %s", Radius, ZRadius, FarmMob);
+				UpdateSearchString();
 				WriteChatf("%s\atZRadius is now: \ap%i", PLUGINMSG, ZRadius);
 				return;
 			}
@@ -475,7 +471,7 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				else {
 					sprintf_s(FarmMob, MAX_STRING, Arg2);
 				}
-				sprintf_s(searchString, MAX_STRING, "npc noalert 1 radius %i zradius %i targetable %s", Radius, ZRadius, FarmMob);
+				UpdateSearchString();
 				WriteChatf("%s\atFarmMob is now: \ap%s", PLUGINMSG, FarmMob);
 				return;
 			}
@@ -786,6 +782,59 @@ bool AmIReady()
 	if (!InGame()) return false;
 	if (HaveAggro()) return false;
 	if (GROUPINFO *myGroup = GetCharInfo()->pGroupInfo) {
+		//Death Check
+		if (!DeadGroupMember) {
+			for (int i = 0; i < 6; i++) {
+				if (myGroup->pMember[i]) {
+					CHAR Name[MAX_STRING] = { 0 };
+					GetCXStr(myGroup->pMember[i]->pName, Name, MAX_STRING);
+					CleanupName(Name, sizeof(Name), FALSE, FALSE);
+					if (strlen(Name)) {
+						if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+							if (pSpawn->StandState == STANDSTATE_DEAD || pSpawn->RespawnTimer) {
+								DeadGroupMember = true;
+								WriteChatf("%s\ap%s \a-t--> \arHas DIED!", PLUGINMSG, pSpawn->DisplayedName);
+								return false;
+							}
+						}
+						else {
+							WriteChatf("%s\ap%s \a-t--> \arHas DIED or left the zone!", PLUGINMSG, Name);
+							DeadGroupMember = true;
+							return false;
+						}
+					}
+					
+				}
+			}
+		}
+		if (DeadGroupMember) {
+			bool StillDead = false;
+			for (int i = 0; i < 6; i++) {
+				if (myGroup->pMember[i]) {
+					CHAR Name[MAX_STRING] = { 0 };
+					GetCXStr(myGroup->pMember[i]->pName, Name, MAX_STRING);
+					CleanupName(Name, sizeof(Name), FALSE, FALSE);//we do this to fix the mercenaryname bug
+					if (strlen(Name)) {
+						if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+							if (pSpawn->StandState == STANDSTATE_DEAD || pSpawn->RespawnTimer) {
+								StillDead = true;
+							}
+						}
+						else {
+							StillDead = true;
+						}
+					}
+
+				}
+			}
+			if (StillDead) {
+				return false;
+			}
+			else {
+				WriteChatf("%s\agNo longer waiting for dead or missing group members.", PLUGINMSG);
+				DeadGroupMember = false;
+			}
+		}
 		//Group Endurance Check
 		if (!GettingEndurance) {
 			for (int i = 0; i < 6; i++) {
@@ -793,7 +842,7 @@ bool AmIReady()
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
 						if (PercentEndurance(pSpawn) < MedEndAt) {
 							GettingEndurance = true;
-							WriteChatf("%s\ar%s needs to med Endurance.", PLUGINMSG, pSpawn->Name);
+							WriteChatf("%s\ap%s\ar needs to med Endurance.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
 						}
 					}
@@ -827,7 +876,7 @@ bool AmIReady()
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
 						if (PercentMana(pSpawn) < MedAt) {
 							GettingMana = true;
-							WriteChatf("%s\ar%s needs to med Mana.", PLUGINMSG, pSpawn->Name);
+							WriteChatf("%s\ap%s\ar needs to med Mana.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
 						}
 					}
@@ -860,7 +909,7 @@ bool AmIReady()
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
 						if (PercentHealth(pSpawn) < HealAt) {
 							GettingHealth = true;
-							WriteChatf("%s\ar%s needs to med Health.", PLUGINMSG, pSpawn->Name);
+							WriteChatf("%s\ap%s\ar needs to med Health.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
 						}
 					}
@@ -1047,7 +1096,7 @@ DWORD getFirstAggroed()
 
 void UpdateSearchString()
 {
-	sprintf_s(searchString, MAX_STRING, "npc noalert 1 radius %i zradius %i targetable %s", Radius, ZRadius, FarmMob);
+	sprintf_s(searchString, MAX_STRING, "npc noalert 1 radius %i zradius %i targetable loc %f %f %f %s", Radius, ZRadius, AnchorX, AnchorY, AnchorZ, FarmMob);
 }
 
 void PluginOn()
@@ -1066,6 +1115,10 @@ void PluginOn()
 	sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gszINIPath, GetCharInfo()->Name);
 	DoINIThings();
 	DiscSetup();
+	AnchorX = GetCharInfo()->pSpawn->X;
+	AnchorY = GetCharInfo()->pSpawn->Y;
+	AnchorZ = GetCharInfo()->pSpawn->Z;
+	UpdateSearchString();
 	WriteChatf("%s\agActivated", PLUGINMSG);
 }
 
@@ -1565,7 +1618,40 @@ inline bool Casting() {
 
 //NotUsed - Complete TODO!
 void PermIgnoreCommand(PSPAWNINFO pChar, PCHAR szline) {
+	if (!InGame()) return;
+	char temp[MAX_STRING] = { 0 };
+	char temp1[MAX_STRING] = { 0 };
+#define pZone ((PZONEINFO)pZoneInfo)
+	VerifyINI(pZone->ShortName, "Ignored", "|", IgnoresFileName);
+	GetPrivateProfileString(pZone->ShortName, "Ignored", "|", temp, MAX_STRING, IgnoresFileName);
+	if (!strlen(szline) && pTarget) {
+		if (!strstr(temp, ((PSPAWNINFO)pTarget)->DisplayedName)) {
+			sprintf_s(temp1, MAX_STRING, "%s|", ((PSPAWNINFO)pTarget)->DisplayedName);
+			strcat_s(temp, MAX_STRING, temp1);
+			WritePrivateProfileString(pZone->ShortName, "Ignored", temp, IgnoresFileName);
+			WriteChatf("%s\ap%s\ay added to permanent ignore list.", PLUGINMSG, ((PSPAWNINFO)pTarget)->DisplayedName);
+			return;
+		}
+		else {
+			WriteChatf("%s\ap%s\ar is already on the permanent ignore list in the INI", PLUGINMSG, ((PSPAWNINFO)pTarget)->DisplayedName);
+			return;
+		}
+	}
+	else if (strlen(szline)) {
+		if (!strstr(temp, szline)) {
+			sprintf_s(temp1, MAX_STRING, "%s|", szline);
+			strcat_s(temp, MAX_STRING, temp1);
+			WritePrivateProfileString(pZone->ShortName, "Ignored", temp, IgnoresFileName);
+			WriteChatf("%s\ap%s\ay added to permanent ignore list.", PLUGINMSG, szline);
+			return;
+		}
+		else {
+			WriteChatf("%s\ap%s\ar is already on the permanent ignore list in the INI", PLUGINMSG, szline);
+			return;
+		}
+	}
 
+#undef pZone
 }
 
 

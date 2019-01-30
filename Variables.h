@@ -2,6 +2,7 @@
 bool activated = false;
 bool CastDetrimental = true;
 bool Debugging = false;
+bool DeadGroupMember = false;
 bool GettingEndurance = false;
 bool GettingHealth = false;
 bool GettingMana = false;
@@ -22,6 +23,11 @@ char IgnoresFileName[MAX_STRING] = "";
 
 
 DWORD MyTargetID = 0;
+
+float AnchorX = 0;
+float AnchorY = 0;
+float AnchorZ = 0;
+
 unsigned __int64 CastLastTimeUsed = GetTickCount64();
 unsigned __int64 DiscLastTimeUsed = GetTickCount64();
 int HealAt = 0;
