@@ -1496,7 +1496,11 @@ bool DiscReady(PSPELL pSpell)
 {
 	if (!InGame()) return false;
 	DWORD timeNow = (DWORD)time(NULL);
+#if !defined(ROF2EMU) && !defined(UFEMU)
 	if (pPCData->GetCombatAbilityTimer(pSpell->ReuseTimerIndex, pSpell->SpellGroup) < timeNow && !IHaveBuff(pSpell)) {
+#else
+	if (pPCData->GetCombatAbilityTimer(pSpell->ReuseTimerIndex) < timeNow && !IHaveBuff(pSpell)) {
+#endif
 		//If substring "Discipline" is found in the name of the disc, this is an active disc. Let's see if there is already one running.
 		if (strstr(pSpell->Name, "Discipline")) {
 			if (pCombatAbilityWnd) {
