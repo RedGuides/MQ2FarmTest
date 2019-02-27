@@ -179,6 +179,17 @@ PLUGIN_API VOID OnPulse(VOID)
 	pulsing = false;
 }
 
+PLUGIN_API VOID SetGameState(DWORD GameState)
+{
+	if (!InGame()) return;
+	if (gGameState == GAMESTATE_INGAME)
+	{
+		//Update the INI
+		sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gszINIPath, GetCharInfo()->Name);
+	}
+
+}
+
 
 // This is called each time a spawn is removed from a zone (removed from EQ's list of spawns).
 // It is NOT called for each existing spawn when a plugin shuts down.
@@ -840,11 +851,17 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentEndurance(pSpawn) < MedEndAt) {
+						if (i == 0 && PercentEndurance(pSpawn) < MedEndAt) {
 							GettingEndurance = true;
 							WriteChatf("%s\ap%s\ar needs to med Endurance.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
 						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent < MedEndAt) {
+							GettingEndurance = true;
+							WriteChatf("%s\ap%s\ar needs to med Endurance(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->EnduranceCurrent);
+							return false;
+						}
+						
 					}
 				}
 			}
@@ -854,7 +871,10 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentEndurance(pSpawn) < MedEndTill) {
+						if (i == 0 && PercentEndurance(pSpawn) < MedEndTill) {
+							stillMedding = true;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent < MedEndTill) {
 							stillMedding = true;
 						}
 					}
@@ -874,9 +894,15 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentMana(pSpawn) < MedAt) {
+						if (!ClassInfo[myGroup->pMember[i]->pSpawn->CharClass].CanCast) continue;
+						if (i == 0 && PercentMana(pSpawn) < MedAt) {
 							GettingMana = true;
 							WriteChatf("%s\ap%s\ar needs to med Mana.", PLUGINMSG, pSpawn->DisplayedName);
+							return false;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent < MedAt) {
+							GettingMana = true;
+							WriteChatf("%s\ap%s\ar needs to med Mana(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->ManaCurrent);
 							return false;
 						}
 					}
@@ -888,7 +914,10 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentMana(pSpawn) < MedTill) {
+						if (i == 0 && PercentMana(pSpawn) < MedTill) {
+							stillMedding = true;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent < MedTill) {
 							stillMedding = true;
 						}
 					}
@@ -907,7 +936,12 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentHealth(pSpawn) < HealAt) {
+						if (i == 0 && PercentHealth(pSpawn) < HealAt) {
+							GettingHealth = true;
+							WriteChatf("%s\ap%s\ar needs to med Health.", PLUGINMSG, pSpawn->DisplayedName);
+							return false;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->HPCurrent != 0 && myGroup->pMember[i]->pSpawn->HPCurrent < HealAt) {
 							GettingHealth = true;
 							WriteChatf("%s\ap%s\ar needs to med Health.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
@@ -922,6 +956,9 @@ bool AmIReady()
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
 						if (PercentHealth(pSpawn) < HealTill) {
+							stillMedding = true;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->HPCurrent != 0 && myGroup->pMember[i]->pSpawn->HPCurrent < HealTill) {
 							stillMedding = true;
 						}
 					}
@@ -1160,8 +1197,10 @@ bool SpellsMemorized()
 
 inline float PercentMana(PSPAWNINFO &pSpawn)
 {
-	if ((float)pSpawn->ManaMax <= 0) return 100.0f;
-	return (float)pSpawn->ManaCurrent / (float)pSpawn->ManaMax * 100.0f;
+	if (unsigned long maxmana = pSpawn->ManaMax)
+		return pSpawn->ManaCurrent * 100 / maxmana;
+	else
+		return 100.0f;
 }
 
 inline float PercentHealth(PSPAWNINFO &pSpawn)
@@ -1690,3 +1729,30 @@ void ShowSettings() {
 	WriteChatf("%s\ayMedEndAt\ar:\ag%i", PLUGINMSG, MedEndAt);
 	WriteChatf("%s\ayMedEndTill\ar:\ag%i", PLUGINMSG, MedEndTill);
 }
+
+/*
+Logic to summon a mercenary.
+if (GetCharInfo()->pSpawn->MercID == 0)
+	{
+		if (CXWnd *pWnd = FindMQ2Window("MMGW_ManageWnd"))
+		{
+			if (CXWnd *pWndButton = pWnd->GetChildItem("MMGW_SuspendButton"))
+			{
+				if (pWndButton->Enabled)
+				{
+					bSummonedMerc = true;
+					WriteChatf("%s:: Summoning mercenary.", PLUGIN_MSG);
+					SendWndClick2(pWndButton, "leftmouseup");
+					return;
+				}
+			}
+		}
+		else if (bSummonMerc)
+		{
+			DoCommand(GetCharInfo()->pSpawn, "/merc");
+			bSummonMerc = false;
+		}
+	}
+*/
+
+
