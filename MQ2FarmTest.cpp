@@ -162,8 +162,10 @@ PLUGIN_API VOID OnPulse(VOID)
 		RestRoutines();
 	}
 	PSPAWNINFO Mob = (PSPAWNINFO)GetSpawnByID(MyTargetID);
-	if (!Mob || !Mob->SpawnID || Mob->Type == SPAWN_CORPSE)
+	if (!Mob || !Mob->SpawnID || Mob->Type == SPAWN_CORPSE) {
 		MyTargetID = 0;
+		ClearTarget();
+	}
 	if (getFirstAggroed() && !MyTargetID) {
 		MyTargetID = getFirstAggroed();
 		Mob = (PSPAWNINFO)GetSpawnByID(MyTargetID);
@@ -174,8 +176,13 @@ PLUGIN_API VOID OnPulse(VOID)
 		MyTargetID = SearchSpawns(searchString);
 		Mob = (PSPAWNINFO)GetSpawnByID(MyTargetID);
 	}
-	if (Mob && (AmIReady() || HaveAggro()))
+	if (Mob && (HaveAggro() || AmIReady())) {
 		NavigateToID(MyTargetID);
+		if (AmFacing(Mob->SpawnID) > 30 && !NavActive())
+			Face(GetCharInfo()->pSpawn, "fast");
+	}
+		
+	
 	pulsing = false;
 }
 
@@ -717,7 +724,8 @@ DWORD SearchSpawns(char szIndex[MAX_STRING])
 	GetPrivateProfileString(pZone->ShortName, "Ignored1", "|", IgnoredMobList1, MAX_STRING, IgnoresFileName);
 	for (unsigned long N = 0; N < gSpawnCount; N++)
 	{
-		if (EQP_DistArray[N].Value.Float > ssSpawn.FRadius && !ssSpawn.bKnownLocation || N > 50)
+		if (Debugging && N > 200) WriteChatf("N was greater than 200, not checking all the mobs!");
+		if (EQP_DistArray[N].Value.Float > ssSpawn.FRadius && !ssSpawn.bKnownLocation || N > 200)
 			break;
 		if (SpawnMatchesSearch(&ssSpawn, (PSPAWNINFO)pCharSpawn, (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr)) {
 			if (PSPAWNINFO pSpawn = (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr) {
@@ -732,6 +740,7 @@ DWORD SearchSpawns(char szIndex[MAX_STRING])
 					if (Debugging) WriteChatf("\ar[\a-t%u\ar]\ap%s was on the ignore list", pSpawn->SpawnID, temp);
 					continue;
 				}
+				if (Debugging) WriteChatf("%s: PathExists: %i PathLength: %i Distance3D: %i", pSpawn->Name, PathExists(pSpawn->SpawnID), (int)PathLength(pSpawn->SpawnID), (int)Distance3DToSpawn(GetCharInfo()->pSpawn, pSpawn));
 				if (PathExists(pSpawn->SpawnID) && (int)PathLength(pSpawn->SpawnID) >= (int)Distance3DToSpawn(GetCharInfo()->pSpawn, pSpawn)) {
 					if (fShortest > PathLength(pSpawn->SpawnID)) {
 						fShortest = PathLength(pSpawn->SpawnID);
