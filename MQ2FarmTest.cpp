@@ -162,8 +162,10 @@ PLUGIN_API VOID OnPulse(VOID)
 		RestRoutines();
 	}
 	PSPAWNINFO Mob = (PSPAWNINFO)GetSpawnByID(MyTargetID);
-	if (!Mob || !Mob->SpawnID || Mob->Type == SPAWN_CORPSE)
+	if (!Mob || !Mob->SpawnID || Mob->Type == SPAWN_CORPSE) {
 		MyTargetID = 0;
+		ClearTarget();
+	}
 	if (getFirstAggroed() && !MyTargetID) {
 		MyTargetID = getFirstAggroed();
 		Mob = (PSPAWNINFO)GetSpawnByID(MyTargetID);
@@ -174,9 +176,25 @@ PLUGIN_API VOID OnPulse(VOID)
 		MyTargetID = SearchSpawns(searchString);
 		Mob = (PSPAWNINFO)GetSpawnByID(MyTargetID);
 	}
-	if (Mob && (AmIReady() || HaveAggro()))
+	if (Mob && (HaveAggro() || AmIReady())) {
 		NavigateToID(MyTargetID);
+		if (AmFacing(Mob->SpawnID) > 30 && !NavActive())
+			Face(GetCharInfo()->pSpawn, "fast");
+	}
+		
+	
 	pulsing = false;
+}
+
+PLUGIN_API VOID SetGameState(DWORD GameState)
+{
+	if (!InGame()) return;
+	if (gGameState == GAMESTATE_INGAME)
+	{
+		//Update the INI
+		sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gszINIPath, GetCharInfo()->Name);
+	}
+
 }
 
 
@@ -706,7 +724,8 @@ DWORD SearchSpawns(char szIndex[MAX_STRING])
 	GetPrivateProfileString(pZone->ShortName, "Ignored1", "|", IgnoredMobList1, MAX_STRING, IgnoresFileName);
 	for (unsigned long N = 0; N < gSpawnCount; N++)
 	{
-		if (EQP_DistArray[N].Value.Float > ssSpawn.FRadius && !ssSpawn.bKnownLocation || N > 50)
+		if (Debugging && N > 200) WriteChatf("N was greater than 200, not checking all the mobs!");
+		if (EQP_DistArray[N].Value.Float > ssSpawn.FRadius && !ssSpawn.bKnownLocation || N > 200)
 			break;
 		if (SpawnMatchesSearch(&ssSpawn, (PSPAWNINFO)pCharSpawn, (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr)) {
 			if (PSPAWNINFO pSpawn = (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr) {
@@ -721,6 +740,7 @@ DWORD SearchSpawns(char szIndex[MAX_STRING])
 					if (Debugging) WriteChatf("\ar[\a-t%u\ar]\ap%s was on the ignore list", pSpawn->SpawnID, temp);
 					continue;
 				}
+				if (Debugging) WriteChatf("%s: PathExists: %i PathLength: %i Distance3D: %i", pSpawn->Name, PathExists(pSpawn->SpawnID), (int)PathLength(pSpawn->SpawnID), (int)Distance3DToSpawn(GetCharInfo()->pSpawn, pSpawn));
 				if (PathExists(pSpawn->SpawnID) && (int)PathLength(pSpawn->SpawnID) >= (int)Distance3DToSpawn(GetCharInfo()->pSpawn, pSpawn)) {
 					if (fShortest > PathLength(pSpawn->SpawnID)) {
 						fShortest = PathLength(pSpawn->SpawnID);
@@ -840,11 +860,17 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentEndurance(pSpawn) < MedEndAt) {
+						if (i == 0 && PercentEndurance(pSpawn) < MedEndAt) {
 							GettingEndurance = true;
 							WriteChatf("%s\ap%s\ar needs to med Endurance.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
 						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent < MedEndAt) {
+							GettingEndurance = true;
+							WriteChatf("%s\ap%s\ar needs to med Endurance(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->EnduranceCurrent);
+							return false;
+						}
+						
 					}
 				}
 			}
@@ -854,7 +880,10 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentEndurance(pSpawn) < MedEndTill) {
+						if (i == 0 && PercentEndurance(pSpawn) < MedEndTill) {
+							stillMedding = true;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent < MedEndTill) {
 							stillMedding = true;
 						}
 					}
@@ -874,9 +903,15 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentMana(pSpawn) < MedAt) {
+						if (!ClassInfo[myGroup->pMember[i]->pSpawn->CharClass].CanCast) continue;
+						if (i == 0 && PercentMana(pSpawn) < MedAt) {
 							GettingMana = true;
 							WriteChatf("%s\ap%s\ar needs to med Mana.", PLUGINMSG, pSpawn->DisplayedName);
+							return false;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent < MedAt) {
+							GettingMana = true;
+							WriteChatf("%s\ap%s\ar needs to med Mana(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->ManaCurrent);
 							return false;
 						}
 					}
@@ -888,7 +923,10 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentMana(pSpawn) < MedTill) {
+						if (i == 0 && PercentMana(pSpawn) < MedTill) {
+							stillMedding = true;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent < MedTill) {
 							stillMedding = true;
 						}
 					}
@@ -907,7 +945,12 @@ bool AmIReady()
 			for (int i = 0; i < 6; i++) {
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (PercentHealth(pSpawn) < HealAt) {
+						if (i == 0 && PercentHealth(pSpawn) < HealAt) {
+							GettingHealth = true;
+							WriteChatf("%s\ap%s\ar needs to med Health.", PLUGINMSG, pSpawn->DisplayedName);
+							return false;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->HPCurrent != 0 && myGroup->pMember[i]->pSpawn->HPCurrent < HealAt) {
 							GettingHealth = true;
 							WriteChatf("%s\ap%s\ar needs to med Health.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
@@ -922,6 +965,9 @@ bool AmIReady()
 				if (myGroup->pMember[i]) {
 					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
 						if (PercentHealth(pSpawn) < HealTill) {
+							stillMedding = true;
+						}
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->HPCurrent != 0 && myGroup->pMember[i]->pSpawn->HPCurrent < HealTill) {
 							stillMedding = true;
 						}
 					}
@@ -1160,8 +1206,10 @@ bool SpellsMemorized()
 
 inline float PercentMana(PSPAWNINFO &pSpawn)
 {
-	if ((float)pSpawn->ManaMax <= 0) return 100.0f;
-	return (float)pSpawn->ManaCurrent / (float)pSpawn->ManaMax * 100.0f;
+	if (unsigned long maxmana = pSpawn->ManaMax)
+		return pSpawn->ManaCurrent * 100 / maxmana;
+	else
+		return 100.0f;
 }
 
 inline float PercentHealth(PSPAWNINFO &pSpawn)
@@ -1694,3 +1742,30 @@ void ShowSettings() {
 	WriteChatf("%s\ayMedEndAt\ar:\ag%i", PLUGINMSG, MedEndAt);
 	WriteChatf("%s\ayMedEndTill\ar:\ag%i", PLUGINMSG, MedEndTill);
 }
+
+/*
+Logic to summon a mercenary.
+if (GetCharInfo()->pSpawn->MercID == 0)
+	{
+		if (CXWnd *pWnd = FindMQ2Window("MMGW_ManageWnd"))
+		{
+			if (CXWnd *pWndButton = pWnd->GetChildItem("MMGW_SuspendButton"))
+			{
+				if (pWndButton->Enabled)
+				{
+					bSummonedMerc = true;
+					WriteChatf("%s:: Summoning mercenary.", PLUGIN_MSG);
+					SendWndClick2(pWndButton, "leftmouseup");
+					return;
+				}
+			}
+		}
+		else if (bSummonMerc)
+		{
+			DoCommand(GetCharInfo()->pSpawn, "/merc");
+			bSummonMerc = false;
+		}
+	}
+*/
+
+
