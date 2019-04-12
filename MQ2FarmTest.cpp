@@ -865,9 +865,9 @@ bool AmIReady()
 							WriteChatf("%s\ap%s\ar needs to med Endurance.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
 						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent < MedEndAt) {
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->GetCurrentEndurance() != 0 && myGroup->pMember[i]->pSpawn->GetCurrentEndurance() < MedEndAt) {
 							GettingEndurance = true;
-							WriteChatf("%s\ap%s\ar needs to med Endurance(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->EnduranceCurrent);
+							WriteChatf("%s\ap%s\ar needs to med Endurance(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->GetCurrentEndurance());
 							return false;
 						}
 						
@@ -883,7 +883,7 @@ bool AmIReady()
 						if (i == 0 && PercentEndurance(pSpawn) < MedEndTill) {
 							stillMedding = true;
 						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent != 0 && myGroup->pMember[i]->pSpawn->EnduranceCurrent < MedEndTill) {
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->GetCurrentEndurance() != 0 && myGroup->pMember[i]->pSpawn->GetCurrentEndurance() < MedEndTill) {
 							stillMedding = true;
 						}
 					}
@@ -909,9 +909,9 @@ bool AmIReady()
 							WriteChatf("%s\ap%s\ar needs to med Mana.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
 						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent < MedAt) {
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->GetCurrentMana() != 0 && myGroup->pMember[i]->pSpawn->GetCurrentMana() < MedAt) {
 							GettingMana = true;
-							WriteChatf("%s\ap%s\ar needs to med Mana(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->ManaCurrent);
+							WriteChatf("%s\ap%s\ar needs to med Mana(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->GetCurrentMana());
 							return false;
 						}
 					}
@@ -926,7 +926,7 @@ bool AmIReady()
 						if (i == 0 && PercentMana(pSpawn) < MedTill) {
 							stillMedding = true;
 						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent != 0 && myGroup->pMember[i]->pSpawn->ManaCurrent < MedTill) {
+						else if (i != 0 && myGroup->pMember[i]->pSpawn->GetCurrentMana() != 0 && myGroup->pMember[i]->pSpawn->GetCurrentMana() < MedTill) {
 							stillMedding = true;
 						}
 					}
@@ -1102,7 +1102,7 @@ void CastDetrimentalSpells()
 				char castcommand[MAX_STRING] = "/cast ";
 				string s = to_string(GemIndex + 1);
 				strcat_s(castcommand, MAX_STRING, s.c_str());
-				if (GetCharInfo()->pSpawn->ManaCurrent > (int)spell->ManaCost) {
+				if (GetCharInfo()->pSpawn->GetCurrentMana() > (int)spell->ManaCost) {
 					if (pTarget && Distance3DToSpawn(GetCharInfo()->pSpawn, (PSPAWNINFO)pTarget) < spell->Range) {
 						WriteChatf("%s\arCasting \a-t----> \ap%s \ayfrom Gem %d", PLUGINMSG, spell->Name, GemIndex + 1);
 						EzCommand(castcommand);
@@ -1206,8 +1206,8 @@ bool SpellsMemorized()
 
 inline float PercentMana(PSPAWNINFO &pSpawn)
 {
-	if (unsigned long maxmana = pSpawn->ManaMax)
-		return pSpawn->ManaCurrent * 100 / maxmana;
+	if (unsigned long maxmana = pSpawn->GetMaxMana())
+		return (float)pSpawn->GetCurrentMana() * 100 / maxmana;
 	else
 		return 100.0f;
 }
@@ -1219,7 +1219,7 @@ inline float PercentHealth(PSPAWNINFO &pSpawn)
 
 inline float PercentEndurance(PSPAWNINFO &pSpawn)
 {
-	return (float)pSpawn->EnduranceCurrent / (float)pSpawn->EnduranceMax * 100.0f;
+	return (float)pSpawn->GetCurrentEndurance() / (float)pSpawn->GetMaxEndurance() * 100.0f;
 }
 
 void NavigateToID(DWORD ID) {
@@ -1565,7 +1565,7 @@ bool DiscReady(PSPELL pSpell)
 		}
 		//If I have enough mana and endurance (Never know, might be mana requirements lol).
 		PSPAWNINFO me = GetCharInfo()->pSpawn;
-		if (me->ManaCurrent >= (int)pSpell->ManaCost && me->EnduranceCurrent >= (int)pSpell->EnduranceCost) {
+		if (me->GetCurrentMana() >= (int)pSpell->ManaCost && me->GetCurrentEndurance() >= (int)pSpell->EnduranceCost) {
 			if (pTarget && me) {
 				if (Distance3DToSpawn(me, (PSPAWNINFO)pTarget) > pSpell->Range) {
 					return false;
