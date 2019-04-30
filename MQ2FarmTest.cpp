@@ -1554,7 +1554,7 @@ bool DiscReady(PSPELL pSpell)
 			if (pCombatAbilityWnd) {
 				if (CXWnd *Child = ((CXWnd*)pCombatAbilityWnd)->GetChildItem("CAW_CombatEffectLabel")) {
 					CHAR szBuffer[2048] = { 0 };
-					if (GetCXStr(Child->WindowText, szBuffer, MAX_STRING) && szBuffer[0] != '\0') {
+					if (GetCXStr(Child->CGetWindowText(), szBuffer, MAX_STRING) && szBuffer[0] != '\0') {
 						if (PSPELL pbuff = GetSpellByName(szBuffer)) {
 							if (Debugging) WriteChatf("Already have an Active Disc: \ag%s, \awCan't use \ar%s", pbuff->Name, pSpell->Name);
 							return false;
