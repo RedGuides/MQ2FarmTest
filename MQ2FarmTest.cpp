@@ -288,6 +288,12 @@ void DoINIThings()
 	CastDetrimental = atob(temp);
 	if (Debugging) WriteChatf("\ayCastDetrimental: \at%d", CastDetrimental);
 
+	//Check for INI entry for Key CastDetrimental in General section.
+	VerifyINI("General", "UseDiscs", "false", ThisINIFileName);
+	GetPrivateProfileString("General", "UseDiscs", "false", temp, MAX_STRING, ThisINIFileName);
+	useDiscs = atob(temp);
+	if (Debugging) WriteChatf("\ayUseDiscs: \at%d", useDiscs);
+
 	if (Debugging) WriteChatf("\ar[\a-tPull\ar]");
 	//Check for INI entry for Key ZRadius in Pull section.
 	VerifyINI("Pull", "ZRadius", "25", ThisINIFileName);
@@ -546,7 +552,78 @@ void FarmCommand(PSPAWNINFO pChar, PCHAR Line) {
 				}
 			}
 		}
+		if (!_stricmp(Arg1, "usediscs"))
+		{
+			GetArg(Arg2, Line, 2);
+			if (!strlen(Arg2)) {
+				if (useDiscs) {
+					WriteChatf("%suseDiscs is On!", PLUGINMSG);
+					return;
+				}
+				else {
+					WriteChatf("%suseDiscs is Off!", PLUGINMSG);
+					return;
+				}
+			}
+			if (IsNumber(Arg2))
+			{
+				if (!_stricmp(Arg2, "1"))
+				{
+					if (!useDiscs) {
+						WriteChatf("%sTurning useDiscs: On!", PLUGINMSG);
+						useDiscs = true;
+						WritePrivateProfileString("General", "UseDiscs", "true", ThisINIFileName);
+						return;
+					}
+					else {
+						WriteChatf("%suseDiscs is already: On!", PLUGINMSG);
+						return;
+					}
+				}
+				if (!_stricmp(Arg2, "0"))
+				{
+					if (useDiscs) {
+						useDiscs = false;
+						WriteChatf("%sTurning useDiscs: Off!", PLUGINMSG);
+						WritePrivateProfileString("General", "UseDiscs", "false", ThisINIFileName);
+						return;
+					}
+					else {
+						WriteChatf("%suseDiscs is already: Off!", PLUGINMSG);
+						return;
+					}
 
+				}
+			}
+			else {
+				if (!_stricmp(Arg2, "on"))
+				{
+					if (!useDiscs) {
+						WriteChatf("%sTurning useDiscs: On!", PLUGINMSG);
+						useDiscs = true;
+						WritePrivateProfileString("General", "UseDiscs", "true", ThisINIFileName);
+						return;
+					}
+					else {
+						WriteChatf("%suseDiscs is already: On!", PLUGINMSG);
+						return;
+					}
+				}
+				if (!_stricmp(Arg2, "off"))
+				{
+					if (useDiscs) {
+						useDiscs = false;
+						WriteChatf("%sTurning useDiscs: Off!", PLUGINMSG);
+						WritePrivateProfileString("General", "UseDiscs", "false", ThisINIFileName);
+						return;
+					}
+					else {
+						WriteChatf("%suseDiscs is already: Off!", PLUGINMSG);
+						return;
+					}
+				}
+			}
+		}
 		if (!_stricmp(Arg1, "debug") || !_stricmp(Arg1, "debugging"))
 		{
 			GetArg(Arg2, Line, 2);
@@ -780,6 +857,7 @@ void ListCommands()
 	WriteChatf("%s\ay/farm farmmob \"Mob Name Here\" \aw--- \atWill specify a farmmob to farm.", PLUGINMSG);
 	WriteChatf("%s\ay/farm farmmob clear \aw--- \atWill clear the FarmMob and attack anything not on an alertlist.", PLUGINMSG);
 	WriteChatf("%s\ay/farm castdetrimental 1|On 0|Off \aw--- \atWill turn on and off casting of single target detrimental spells.", PLUGINMSG);
+	WriteChatf("%s\ay/farm usediscs 1|On 0|Off \aw--- \atWill turn on and off discs.", PLUGINMSG);
 	WriteChatf("%s\ay/farm debug 1|on 0|Off \aw---\atWill turn on and off debugging messages", PLUGINMSG);
 	WriteChatf("%s\ay/farm MedAt \aw---\atWill show you when you will med mana", PLUGINMSG);
 	WriteChatf("%s\ay/farm MedAt #### \aw---\atWill set when you when you will med mana", PLUGINMSG);
