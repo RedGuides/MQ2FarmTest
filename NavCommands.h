@@ -1,23 +1,14 @@
+#pragma once
+#include "..\MQ2Plugin.h"
 
-typedef bool(__cdecl *fNavPathExists)(PCHAR szLine);
-fNavPathExists NavPathExists = 0;
+using fIsNavMeshLoaded = bool(*)();
+using fIsNavPathActive = bool(*)();
+using fIsNavPossible = bool(*)(const char* szLine);
+using fGetNavPathLength = float(*)(const char* szLine);
+using fExecuteNavCommand = bool(*)(const char* szLine);
+using fIsNavPathPaused = bool(*)();
 
-typedef float(__cdecl *fNavPathLength)(PCHAR szLine);
-fNavPathLength NavPathLength = 0;
-
-typedef VOID(__cdecl *fNavCommand)(PSPAWNINFO pChar, PCHAR szLine);
-fNavCommand TheNavCommand = 0;
-
-typedef bool(__cdecl *fNavMeshLoaded)();
-fNavMeshLoaded NavMeshLoaded = 0;
-
-typedef bool(__cdecl *fNavPathActive)();
-fNavPathActive NavPathActive = 0;
-
-typedef bool(__cdecl *fNavPathPaused)();
-fNavPathPaused NavPathPaused = 0;
-
-PMQPLUGIN pNav = nullptr;
+unsigned long long NavTimer = 0;
 
 static PMQPLUGIN FindMQ2NavPlugin()
 {
@@ -35,16 +26,16 @@ static PMQPLUGIN FindMQ2NavPlugin()
 	return nullptr;
 }
 
-float PathLength(DWORD SpawnID)
+float PathLength(unsigned long SpawnID)
 {
 	PMQPLUGIN pNav;
-	fNavPathLength NavPathLength = 0;
+	fGetNavPathLength NavPathLength = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
-		NavPathLength = (fNavPathLength)GetProcAddress(pNav->hModule, "NavPathLength");
+		NavPathLength = (fGetNavPathLength)GetProcAddress(pNav->hModule, "GetNavPathLength");
 		if (NavPathLength)
 		{
-			CHAR szNavLine[32];
+			char szNavLine[32] = { 0 };
 			sprintf_s(szNavLine, 32, "id %u", SpawnID);
 			bool bTemp = gFilterMQ;
 			gFilterMQ = true;
@@ -55,23 +46,23 @@ float PathLength(DWORD SpawnID)
 	}
 	return 9999.0f;
 }
-bool PathExists(DWORD SpawnID)
+
+bool PathExists(unsigned long SpawnID)
 {
 	PMQPLUGIN pNav;
-	fNavPathExists NavPathExists = 0;
+	fIsNavPossible NavPathExists = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
-		NavPathExists = (fNavPathExists)GetProcAddress(pNav->hModule, "NavPossible");
+		NavPathExists = (fIsNavPossible)GetProcAddress(pNav->hModule, "IsNavPossible");
 		if (NavPathExists)
 		{
-			CHAR szNavLine[32];
+			char szNavLine[32] = { 0 };
 			sprintf_s(szNavLine, 32, "id %u", SpawnID);
 			bool bTemp = gFilterMQ;
 			gFilterMQ = true;
 			bool bTemp2 = NavPathExists(szNavLine);
-			WriteChatf("Temp2: %d", bTemp2);
 			gFilterMQ = bTemp;
-			return bTemp2;
+			if (bTemp2) return bTemp2;
 		}
 	}
 	return false;
@@ -80,13 +71,11 @@ bool PathExists(DWORD SpawnID)
 bool MeshLoaded()
 {
 	PMQPLUGIN pNav;
-	fNavMeshLoaded NavMeshLoaded = 0;
+	fIsNavMeshLoaded NavMeshLoaded = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
 		//Custom MeshCheck
-		NavMeshLoaded = (fNavMeshLoaded)GetProcAddress(pNav->hModule, "NavMeshLoaded"); //mmo MeshCheck
-		if (!NavMeshLoaded)
-			NavMeshLoaded = (fNavMeshLoaded)GetProcAddress(pNav->hModule, "IsMeshLoaded"); //rg MeshCheck
+		NavMeshLoaded = (fIsNavMeshLoaded)GetProcAddress(pNav->hModule, "IsNavMeshLoaded");
 		if (NavMeshLoaded)
 		{
 			return NavMeshLoaded();
@@ -98,10 +87,10 @@ bool MeshLoaded()
 bool NavActive()
 {
 	PMQPLUGIN pNav;
-	fNavPathActive NavPathActive = 0;
+	fIsNavPathActive NavPathActive = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
-		NavPathActive = (fNavMeshLoaded)GetProcAddress(pNav->hModule, "NavPathActive");
+		NavPathActive = (fIsNavMeshLoaded)GetProcAddress(pNav->hModule, "IsNavPathActive");
 		if (NavPathActive)
 		{
 			return NavPathActive();
@@ -113,10 +102,10 @@ bool NavActive()
 bool NavPaused()
 {
 	PMQPLUGIN pNav;
-	fNavPathPaused NavPathPaused = 0;
+	fIsNavPathPaused NavPathPaused = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
-		NavPathPaused = (fNavPathPaused)GetProcAddress(pNav->hModule, "NavPathPaused");
+		NavPathPaused = (fIsNavPathPaused)GetProcAddress(pNav->hModule, "IsNavPathPaused");
 		if (NavPathPaused)
 		{
 			return NavPathPaused();
@@ -125,39 +114,42 @@ bool NavPaused()
 	return false;
 }
 
-VOID NavCommand(PSPAWNINFO pChar, PCHAR szLine)
+void NavCommand(char* szLine)
 {
 	PMQPLUGIN pNav;
-	fNavCommand TheNavCommand = 0;
+	fExecuteNavCommand TheNavCommand = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
-		TheNavCommand = (fNavCommand)GetProcAddress(pNav->hModule, "NavCommand");
+		TheNavCommand = (fExecuteNavCommand)GetProcAddress(pNav->hModule, "ExecuteNavCommand");
 		if (TheNavCommand)
 		{
-			CHAR szNavLine[32];
-			sprintf_s(szNavLine, 32, "id %s", szLine);
+			char szNavLine[MAX_STRING] = { 0 };
+			sprintf_s(szNavLine, MAX_STRING, "%s", szLine);
 			bool bTemp = gFilterMQ;
 			gFilterMQ = true;
-			TheNavCommand(pChar, szNavLine);
+			TheNavCommand(szNavLine);
 			gFilterMQ = bTemp;
+			NavTimer = GetTickCount64();
 		}
-
+	}
+	else {
+		WriteChatf("Couldn't find MQ2Nav Plugin in the plugin list");
 	}
 	return;
 }
 
-void NavEnd(PSPAWNINFO pChar)
+void NavEnd()
 {
 	PMQPLUGIN pNav;
-	fNavCommand TheNavCommand = 0;
+	fExecuteNavCommand TheNavCommand = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
-		TheNavCommand = (fNavCommand)GetProcAddress(pNav->hModule, "NavCommand");
+		TheNavCommand = (fExecuteNavCommand)GetProcAddress(pNav->hModule, "ExecuteNavCommand");
 		if (TheNavCommand)
 		{
 			bool bTemp = gFilterMQ;
 			gFilterMQ = true;
-			TheNavCommand(pChar, "stop");
+			TheNavCommand("stop");
 			gFilterMQ = bTemp;
 		}
 	}

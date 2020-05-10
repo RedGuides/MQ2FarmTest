@@ -6,15 +6,18 @@ public:
 		TargetID = 1,
 		Version = 2,
 	};
+
 	MQ2FarmType() :MQ2Type("Farm")
 	{
 		TypeMember(TargetID);//1,
 		TypeMember(Version);//2,
 	}
+
 	~MQ2FarmType()
 	{
 	}
-	bool GetMember(MQ2VARPTR VarPtr, PCHAR Member, PCHAR Index, MQ2TYPEVAR &Dest)
+
+	bool GetMember(MQ2VARPTR VarPtr, char* Member, char* Index, MQ2TYPEVAR &Dest)
 	{
 		PMQ2TYPEMEMBER pMember = MQ2FarmType::FindMember(Member);
 		if (!pMember)
@@ -33,7 +36,7 @@ public:
 		return false;
 	}
 
-	bool ToString(MQ2VARPTR VarPtr, PCHAR Destination)
+	bool ToString(MQ2VARPTR VarPtr, char* Destination)
 	{
 		return true;
 	}
@@ -42,21 +45,22 @@ public:
 	{
 		return false;
 	}
-	bool FromString(MQ2VARPTR &VarPtr, PCHAR Source)
+
+	bool FromString(MQ2VARPTR &VarPtr, char* Source)
 	{
 		return false;
 	}
-
 };
 
 class MQ2FarmType *pFarmType = 0;
 
-BOOL dataFarm(PCHAR szIndex, MQ2TYPEVAR &Ret)
+BOOL dataFarm(char* szIndex, MQ2TYPEVAR &Ret)
 {
 	if (szIndex != NULL)
 	{
 		//${Farm[szIndex]} gets used, the output goes here.
 	}
+
 	Ret.DWord = 1;
 	Ret.Type = pFarmType;
 	return true;

@@ -1,20 +1,20 @@
 //Prototypes
 bool AmIReady();
-bool atob(char x[MAX_STRING]);
+bool atob(char* x);
 bool DiscReady(PSPELL);
 bool HaveAggro();
 bool IHaveBuff(PSPELL);
 bool MeshLoaded();
 bool NavActive();
 bool NavPaused();
-bool PathExists(DWORD SpawnID);
+bool PathExists(unsigned long SpawnID);
 bool SpellsMemorized();
 
-DWORD getFirstAggroed();
-DWORD SearchSpawns(char szIndex[MAX_STRING]);
+unsigned long getFirstAggroed();
+unsigned long SearchSpawns(char* szIndex);
 
-float AmFacing(DWORD ID);
-float PathLength(DWORD SpawnID);
+float AmFacing(unsigned long ID);
+float PathLength(unsigned long SpawnID);
 
 inline bool Casting();
 inline bool InGame();
@@ -29,14 +29,14 @@ void CheckAlias();
 void ClearTarget();
 void DiscSetup();
 void DoINIThings();
-void FarmCommand(PSPAWNINFO pChar, PCHAR Line);
-void IgnoreThisCommand(PSPAWNINFO pChar, PCHAR szLine);
-void IgnoreTheseCommand(PSPAWNINFO pChar, PCHAR szLine);
+void FarmCommand(PSPAWNINFO pChar, char* Line);
+void IgnoreThisCommand(PSPAWNINFO pChar, char* szLine);
+void IgnoreTheseCommand(PSPAWNINFO pChar, char* szLine);
 void ListCommands();
-void NavCommand(PSPAWNINFO pChar, PCHAR szLine);
-void NavEnd(PSPAWNINFO pChar);
-void NavigateToID(DWORD ID);
-void PermIgnoreCommand(PSPAWNINFO pchar, PCHAR szline);
+void NavCommand(char* szLine);
+void NavEnd();
+void NavigateToID(unsigned long ID);
+void PermIgnoreCommand(PSPAWNINFO pchar, char* szline);
 void PluginOn();
 void PluginOff();
 void RestRoutines();
@@ -44,8 +44,6 @@ void SummonThings(std::vector<PSPELL>);
 void ShowSettings();
 void UpdateSearchString();
 void UseDiscs();
-void VerifyINI(char ININame[MAX_STRING], char Section[MAX_STRING], char Key[MAX_STRING], char Default[MAX_STRING]);
-
-#define TargetIt(X) *(PSPAWNINFO*)ppTarget=X
+void VerifyINI(char* ININame, char* Section, char* Key, char* Default);
 
 //End Prototypes
