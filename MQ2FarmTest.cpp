@@ -82,20 +82,17 @@ DiscAdd7=Blood Brand
 DiscAdd8=Axe of the Demolisher
 */
 
+#include <mq/Plugin.h>
 
-#define PLUGIN_NAME "MQ2FarmTest"
-#define VERSION "0.3"
-#define PLUGINMSG "\ar[\a-tMQ2Farm\ar]\ao:: "
-#include "../MQ2Plugin.h"
+PreSetup("MQ2FarmTest");
+PLUGIN_VERSION(0.3);
+
 #include "Prototypes.h"
 #include "Variables.h"
 #include "NavCommands.h"
 #include "FarmType.h"
-#include <vector>
-using namespace std;
 
-PreSetup(PLUGIN_NAME);
-PLUGIN_VERSION(atof(VERSION));
+#define PLUGINMSG "\ar[\a-tMQ2Farm\ar]\ao:: "
 
 void TargetIt(PSPAWNINFO pSpawn) {
 	if (!pSpawn)
@@ -104,7 +101,7 @@ void TargetIt(PSPAWNINFO pSpawn) {
 	if (Debugging)
 		WriteChatf("%s \a-tTargeting: %s", PLUGINMSG, pSpawn->Name);
 
-	*(PSPAWNINFO*)ppTarget = pSpawn;
+	pTarget = pSpawn;
 	if (pTarget) {
 		if (PSPAWNINFO mytarget = (PSPAWNINFO)pTarget) {
 			char szname[64] = { 0 };
@@ -121,16 +118,16 @@ PLUGIN_API void InitializePlugin()
 	AddMQ2Data("Farm", dataFarm);
 	pFarmType = new MQ2FarmType;
 	if (InGame()) {
-		sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gszINIPath, GetCharInfo()->Name);
+		sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gPathConfig, GetCharInfo()->Name);
 		DoINIThings();
 	}
 	AddCommand("/farm", FarmCommand);
 	AddCommand("/ignorethese", IgnoreTheseCommand);
 	AddCommand("/ignorethis", IgnoreThisCommand);
 	AddCommand("/permignore", PermIgnoreCommand);
-	WriteChatf("%s\aw- \ag%s", PLUGINMSG, VERSION);
+	WriteChatf("%s\aw- \ag%s", PLUGINMSG, MQ2Version);
 	WriteChatf("%s \ao/farm help \aw- \ay For a list of commands!", PLUGINMSG);
-	sprintf_s(IgnoresFileName, MAX_STRING, "%s\\Macros\\FarmMobIgnored.ini", gszINIPath);
+	sprintf_s(IgnoresFileName, MAX_STRING, "%s\\FarmMobIgnored.ini", gPathConfig);
 
 }
 
@@ -209,7 +206,7 @@ PLUGIN_API void SetGameState(unsigned long GameState)
 	if (gGameState == GAMESTATE_INGAME)
 	{
 		//Update the INI
-		sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gszINIPath, GetCharInfo()->Name);
+		sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gPathConfig, GetCharInfo()->Name);
 	}
 
 }
@@ -255,7 +252,7 @@ bool atob(char* x)
 
 inline bool InGame()
 {
-	return(GetGameState() == GAMESTATE_INGAME && GetCharInfo() && GetCharInfo()->pSpawn && GetCharInfo2());
+	return(GetGameState() == GAMESTATE_INGAME && GetCharInfo() && GetCharInfo()->pSpawn && GetPcProfile());
 }
 
 void DoINIThings()
@@ -423,7 +420,7 @@ void FarmCommand(PSPAWNINFO pChar, char* Line) {
 	sprintf_s(buffer, MAX_STRING, GetCharInfo()->Name);
 	if (!strlen(ThisINIFileName) || !strstr(ThisINIFileName, buffer)) {
 		WriteChatf("%s\ayUpdating the characters INI to be this character", PLUGINMSG);
-		sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gszINIPath, GetCharInfo()->Name);
+		sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gPathConfig, GetCharInfo()->Name);
 	}
 
 	if (strlen(Line)) {
@@ -805,7 +802,7 @@ unsigned long SearchSpawns(char* szIndex)
 	#define pZone ((PZONEINFO)pZoneInfo)
 	double fShortest = 9999.0f;
 	PSPAWNINFO sShortest = nullptr;
-	SEARCHSPAWN ssSpawn;
+	MQSpawnSearch ssSpawn;
 	ClearSearchSpawn(&ssSpawn);
 	ParseSearchSpawn(szIndex, &ssSpawn);
 
@@ -831,7 +828,7 @@ unsigned long SearchSpawns(char* szIndex)
 	VerifyINI(pZone->ShortName, "Ignored1", "|", IgnoresFileName);
 	GetPrivateProfileString(pZone->ShortName, "Ignored1", "|", IgnoredMobList1, MAX_STRING, IgnoresFileName);
 
-	for (unsigned long N = 0; N < gSpawnCount; N++)
+	for (int N = 0; N < gSpawnCount; N++)
 	{
 		if (bFound)
 			countersincefound++;
@@ -954,16 +951,14 @@ bool AmIReady()
 	if (HaveAggro())
 		return false;
 
-	if (GROUPINFO *myGroup = GetCharInfo()->pGroupInfo) {
+	// FIXME:  There's a ton of duplicate logic through this -- and you're looping the group the same way every time
+	if (CGroup* myGroup = GetCharInfo()->pGroupInfo) {
 		//Death Check
 		if (!DeadGroupMember) {
-			for (int i = 0; i < 6; i++) {
-				if (myGroup->pMember[i]) {
-					char Name[MAX_STRING] = { 0 };
-					GetCXStr(myGroup->pMember[i]->pName, Name, MAX_STRING);
-					CleanupName(Name, sizeof(Name), FALSE, FALSE);
-					if (strlen(Name)) {
-						if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+			for (int i = 0; i < MAX_GROUP_SIZE; i++) {
+				if (const auto groupMember = myGroup->GetGroupMember(i)) {
+					if (groupMember->GetName()[0] != '\0') {
+						if (const auto pSpawn = groupMember->pSpawn) {
 							if (pSpawn->StandState == STANDSTATE_DEAD || pSpawn->RespawnTimer) {
 								DeadGroupMember = true;
 								WriteChatf("%s\ap%s \a-t--> \arHas DIED!", PLUGINMSG, pSpawn->DisplayedName);
@@ -971,7 +966,7 @@ bool AmIReady()
 							}
 						}
 						else {
-							WriteChatf("%s\ap%s \a-t--> \arHas DIED or left the zone!", PLUGINMSG, Name);
+							WriteChatf("%s\ap%s \a-t--> \arHas DIED or left the zone!", PLUGINMSG, groupMember->GetName());
 							DeadGroupMember = true;
 							return false;
 						}
@@ -983,13 +978,10 @@ bool AmIReady()
 
 		if (DeadGroupMember) {
 			bool StillDead = false;
-			for (int i = 0; i < 6; i++) {
-				if (myGroup->pMember[i]) {
-					char Name[MAX_STRING] = { 0 };
-					GetCXStr(myGroup->pMember[i]->pName, Name, MAX_STRING);
-					CleanupName(Name, sizeof(Name), FALSE, FALSE);//we do this to fix the mercenaryname bug
-					if (strlen(Name)) {
-						if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+			for (int i = 0; i < MAX_GROUP_SIZE; i++) {
+				if (const auto groupMember = myGroup->GetGroupMember(i)) {
+					if (groupMember->GetName()[0] != '\0') {
+						if (const auto pSpawn = groupMember->pSpawn) {
 							if (pSpawn->StandState == STANDSTATE_DEAD || pSpawn->RespawnTimer) {
 								StillDead = true;
 							}
@@ -1012,17 +1004,18 @@ bool AmIReady()
 		}
 		//Group Endurance Check
 		if (!GettingEndurance) {
-			for (int i = 0; i < 6; i++) {
-				if (myGroup->pMember[i]) {
-					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+			for (int i = 0; i < MAX_GROUP_SIZE; i++) {
+				if (const auto groupMember = myGroup->GetGroupMember(i)) {
+					if (const auto pSpawn = groupMember->pSpawn) {
 						if (i == 0 && PercentEndurance(pSpawn) < MedEndAt) {
 							GettingEndurance = true;
 							WriteChatf("%s\ap%s\ar needs to med Endurance.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
 						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->GetCurrentEndurance() != 0 && myGroup->pMember[i]->pSpawn->GetCurrentEndurance() < MedEndAt) {
+
+						if (i != 0 && pSpawn->GetCurrentEndurance() != 0 && pSpawn->GetCurrentEndurance() < MedEndAt) {
 							GettingEndurance = true;
-							WriteChatf("%s\ap%s\ar needs to med Endurance(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->GetCurrentEndurance());
+							WriteChatf("%s\ap%s\ar needs to med Endurance(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, pSpawn->GetCurrentEndurance());
 							return false;
 						}
 
@@ -1032,13 +1025,13 @@ bool AmIReady()
 		}
 		else if (GettingEndurance) {
 			bool stillMedding = false;
-			for (int i = 0; i < 6; i++) {
-				if (myGroup->pMember[i]) {
-					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+			for (int i = 0; i < MAX_GROUP_SIZE; i++) {
+				if (const auto groupMember = myGroup->GetGroupMember(i)) {
+					if (const auto pSpawn = groupMember->pSpawn) {
 						if (i == 0 && PercentEndurance(pSpawn) < MedEndTill) {
 							stillMedding = true;
 						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->GetCurrentEndurance() != 0 && myGroup->pMember[i]->pSpawn->GetCurrentEndurance() < MedEndTill) {
+						else if (i != 0 && pSpawn->GetCurrentEndurance() != 0 && pSpawn->GetCurrentEndurance() < MedEndTill) {
 							stillMedding = true;
 						}
 					}
@@ -1056,10 +1049,10 @@ bool AmIReady()
 
 		//Group Mana Check
 		if (!GettingMana) {
-			for (int i = 0; i < 6; i++) {
-				if (myGroup->pMember[i]) {
-					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (!ClassInfo[myGroup->pMember[i]->pSpawn->CharClass].CanCast)
+			for (int i = 0; i < MAX_GROUP_SIZE; i++) {
+				if (const auto groupMember = myGroup->GetGroupMember(i)) {
+					if (const auto pSpawn = groupMember->pSpawn) {
+						if (!ClassInfo[pSpawn->CharClass].CanCast)
 							continue;
 
 						if (i == 0 && PercentMana(pSpawn) < MedAt) {
@@ -1067,9 +1060,9 @@ bool AmIReady()
 							WriteChatf("%s\ap%s\ar needs to med Mana.", PLUGINMSG, pSpawn->DisplayedName);
 							return false;
 						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->GetCurrentMana() != 0 && myGroup->pMember[i]->pSpawn->GetCurrentMana() < MedAt) {
+						else if (i != 0 && pSpawn->GetCurrentMana() != 0 && pSpawn->GetCurrentMana() < MedAt) {
 							GettingMana = true;
-							WriteChatf("%s\ap%s\ar needs to med Mana(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, myGroup->pMember[i]->pSpawn->GetCurrentMana());
+							WriteChatf("%s\ap%s\ar needs to med Mana(\ag%i%%).", PLUGINMSG, pSpawn->DisplayedName, pSpawn->GetCurrentMana());
 							return false;
 						}
 					}
@@ -1078,13 +1071,13 @@ bool AmIReady()
 		}
 		else if (GettingMana) {
 			bool stillMedding = false;
-			for (int i = 0; i < 6; i++) {
-				if (myGroup->pMember[i]) {
-					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+			for (int i = 0; i < MAX_GROUP_SIZE; i++) {
+				if (const auto groupMember = myGroup->GetGroupMember(i)) {
+					if (const auto pSpawn = groupMember->pSpawn) {
 						if (i == 0 && PercentMana(pSpawn) < MedTill) {
 							stillMedding = true;
 						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->GetCurrentMana() != 0 && myGroup->pMember[i]->pSpawn->GetCurrentMana() < MedTill) {
+						else if (i != 0 && pSpawn->GetCurrentMana() != 0 && pSpawn->GetCurrentMana() < MedTill) {
 							stillMedding = true;
 						}
 					}
@@ -1102,17 +1095,19 @@ bool AmIReady()
 		//Group Health Check
 		if (!GettingHealth) {
 			for (int i = 0; i < 6; i++) {
-				if (myGroup->pMember[i]) {
-					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
-						if (i == 0 && PercentHealth(pSpawn) < HealAt) {
-							GettingHealth = true;
-							WriteChatf("%s\ap%s\ar needs to med Health.", PLUGINMSG, pSpawn->DisplayedName);
-							return false;
-						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->HPCurrent != 0 && myGroup->pMember[i]->pSpawn->HPCurrent < HealAt) {
-							GettingHealth = true;
-							WriteChatf("%s\ap%s\ar needs to med Health.", PLUGINMSG, pSpawn->DisplayedName);
-							return false;
+				for (int i = 0; i < MAX_GROUP_SIZE; i++) {
+					if (const auto groupMember = myGroup->GetGroupMember(i)) {
+						if (const auto pSpawn = groupMember->pSpawn) {
+							if (i == 0 && PercentHealth(pSpawn) < HealAt) {
+								GettingHealth = true;
+								WriteChatf("%s\ap%s\ar needs to med Health.", PLUGINMSG, pSpawn->DisplayedName);
+								return false;
+							}
+							else if (i != 0 && pSpawn->HPCurrent != 0 && pSpawn->HPCurrent < HealAt) {
+								GettingHealth = true;
+								WriteChatf("%s\ap%s\ar needs to med Health.", PLUGINMSG, pSpawn->DisplayedName);
+								return false;
+							}
 						}
 					}
 				}
@@ -1120,13 +1115,13 @@ bool AmIReady()
 		}
 		else if (GettingHealth) {
 			bool stillMedding = false;
-			for (int i = 0; i < 6; i++) {
-				if (myGroup->pMember[i]) {
-					if (PSPAWNINFO pSpawn = myGroup->pMember[i]->pSpawn) {
+			for (int i = 0; i < MAX_GROUP_SIZE; i++) {
+				if (const auto groupMember = myGroup->GetGroupMember(i)) {
+					if (const auto pSpawn = groupMember->pSpawn) {
 						if (PercentHealth(pSpawn) < HealTill) {
 							stillMedding = true;
 						}
-						else if (i != 0 && myGroup->pMember[i]->pSpawn->HPCurrent != 0 && myGroup->pMember[i]->pSpawn->HPCurrent < HealTill) {
+						else if (i != 0 && pSpawn->HPCurrent != 0 && pSpawn->HPCurrent < HealTill) {
 							stillMedding = true;
 						}
 					}
@@ -1215,7 +1210,7 @@ bool HaveAggro()
 		return false;
 
 	for (int i = 0; i < xtm->XTargetSlots.Count; i++) {
-		XTARGETSLOT xts = xtm->XTargetSlots[i];
+		ExtendedTargetSlot xts = xtm->XTargetSlots[i];
 		if (xts.xTargetType != XTARGET_AUTO_HATER)
 			continue;
 
@@ -1252,13 +1247,13 @@ void CastDetrimentalSpells()
 		GemIndex = 0;
 	}
 
-	SPELL *spell = GetSpellByID(GetCharInfo2()->MemorizedSpells[GemIndex]);
+	SPELL *spell = GetSpellByID(GetPcProfile()->MemorizedSpells[GemIndex]);
 	while (!spell) {
 		GemIndex++;
 		if (GemIndex > 13)
 			GemIndex = 0;
 
-		spell = GetSpellByID(GetCharInfo2()->MemorizedSpells[GemIndex]);
+		spell = GetSpellByID(GetPcProfile()->MemorizedSpells[GemIndex]);
 	}
 
 	if (spell && spell->CanCastInCombat) {
@@ -1278,7 +1273,7 @@ void CastDetrimentalSpells()
 					WriteChatf("Spell: %s, TargetType: %d, SpellType: %d", spell->Name, spell->TargetType, spell->SpellType);
 
 				char castcommand[MAX_STRING] = "/cast ";
-				string s = to_string(GemIndex + 1);
+				std::string s = std::to_string(GemIndex + 1);
 				strcat_s(castcommand, MAX_STRING, s.c_str());
 
 				if (GetCharInfo()->pSpawn->GetCurrentMana() > (int)spell->ManaCost) {
@@ -1310,7 +1305,7 @@ unsigned long getFirstAggroed()
 		return 0;
 
 	for (int i = 0; i < xtm->XTargetSlots.Count; i++) {
-		XTARGETSLOT xts = xtm->XTargetSlots[i];
+		ExtendedTargetSlot xts = xtm->XTargetSlots[i];
 		if (xts.xTargetType != XTARGET_AUTO_HATER)
 			continue;
 
@@ -1345,7 +1340,7 @@ void PluginOn()
 
 	activated = true;
 	CheckAlias();
-	sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gszINIPath, GetCharInfo()->Name);
+	sprintf_s(ThisINIFileName, MAX_STRING, "%s\\MQ2FarmTest_%s.ini", gPathConfig, GetCharInfo()->Name);
 	DoINIThings();
 	DiscSetup();
 	AnchorX = GetCharInfo()->pSpawn->X;
@@ -1393,13 +1388,13 @@ float AmFacing(unsigned long ID)
 bool SpellsMemorized()
 {
 	for (int i = 0; i < 13; i++) {
-		SPELL *Spell = GetSpellByID(GetCharInfo2()->MemorizedSpells[i]);
+		SPELL *Spell = GetSpellByID(GetPcProfile()->MemorizedSpells[i]);
 		if (Spell) return true;
 	}
 	return false;
 }
 
-inline float PercentMana(PSPAWNINFO &pSpawn)
+inline float PercentMana(PlayerClient* pSpawn)
 {
 	if (unsigned long maxmana = pSpawn->GetMaxMana())
 		return (float)pSpawn->GetCurrentMana() * 100 / maxmana;
@@ -1407,12 +1402,12 @@ inline float PercentMana(PSPAWNINFO &pSpawn)
 		return 100.0f;
 }
 
-inline float PercentHealth(PSPAWNINFO &pSpawn)
+inline float PercentHealth(PlayerClient* pSpawn)
 {
 	return (float)pSpawn->HPCurrent / (float)pSpawn->HPMax * 100.0f;
 }
 
-inline float PercentEndurance(PSPAWNINFO &pSpawn)
+inline float PercentEndurance(PlayerClient* pSpawn)
 {
 	return (float)pSpawn->GetCurrentEndurance() / (float)pSpawn->GetMaxEndurance() * 100.0f;
 }
@@ -1785,8 +1780,8 @@ bool DiscReady(PSPELL pSpell)
 		if (strstr(pSpell->Name, "Discipline")) {
 			if (pCombatAbilityWnd) {
 				if (CXWnd *Child = ((CXWnd*)pCombatAbilityWnd)->GetChildItem("CAW_CombatEffectLabel")) {
-					char szBuffer[2048] = { 0 };
-					if (GetCXStr(Child->CGetWindowText(), szBuffer, MAX_STRING) && szBuffer[0] != '\0') {
+					CXStr szBuffer = Child->GetWindowText();
+					if (szBuffer[0] != '\0') {
 						if (PSPELL pbuff = GetSpellByName(szBuffer)) {
 							if (Debugging)
 								WriteChatf("Already have an Active Disc: \ag%s, \awCan't use \ar%s", pbuff->Name, pSpell->Name);
@@ -1832,9 +1827,9 @@ bool DiscReady(PSPELL pSpell)
 			for (int i = 0; i < 4; i++) {
 				if (pSpell->ReagentCount[i] > 0) {
 					if (pSpell->ReagentID[i] != -1) {
-						unsigned long count = FindItemCountByID((int)pSpell->ReagentID[i]);
+						int count = FindItemCountByID(pSpell->ReagentID[i]);
 						if (count < pSpell->ReagentCount[i]) {
-							if (char* pitemname = GetItemFromContents(FindItemByID((int)pSpell->ReagentID[i]))->Name) {
+							if (char* pitemname = GetItemFromContents(FindItemByID(pSpell->ReagentID[i]))->Name) {
 								if (Debugging)
 									WriteChatf("\ap%s\aw needs Reagent: \ay%s x \ag%i", pSpell->Name, pitemname, pSpell->ReagentCount[i]);
 							}
@@ -1861,7 +1856,7 @@ bool IHaveBuff(PSPELL pSpell) {
 		return false;
 
 	for (int i = 0; i < NUM_LONG_BUFFS; i++) {
-		if (PSPELL pBuff = GetSpellByID(GetCharInfo2()->Buff[i].SpellID)) {
+		if (PSPELL pBuff = GetSpellByID(GetPcProfile()->Buff[i].SpellID)) {
 			if (strstr(pBuff->Name, pSpell->Name)) {
 				//WriteChatf("---Buff: %s strstr: %i", pBuff->Name, (int)strstr(pBuff->Name, pSpell->Name));
 				return true;
@@ -1870,7 +1865,7 @@ bool IHaveBuff(PSPELL pSpell) {
 	}
 
 	for (int i = 0; i < NUM_SHORT_BUFFS; i++) {
-		if (PSPELL pBuff = GetSpellByID(GetCharInfo2()->ShortBuff[i].SpellID)) {
+		if (PSPELL pBuff = GetSpellByID(GetPcProfile()->ShortBuff[i].SpellID)) {
 			if (strstr(pBuff->Name, pSpell->Name)) {
 				//WriteChatf("---Buff: %s strstr: %i", pBuff->Name, (int)strstr(pBuff->Name, pSpell->Name));
 				return true;
@@ -1962,7 +1957,7 @@ void PermIgnoreCommand(PSPAWNINFO pChar, char* szline) {
 
 
 //NotUsed
-void SummonThings(vector<PSPELL> spellList) {
+void SummonThings(std::vector<PSPELL> spellList) {
 	for (unsigned int i = 0; i < spellList.size(); i++) {
 		if (PSPELL pSpell = spellList.at(i)) {
 			if (DiscReady(pSpell)) {

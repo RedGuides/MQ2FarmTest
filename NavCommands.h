@@ -1,5 +1,4 @@
 #pragma once
-#include "..\MQ2Plugin.h"
 
 using fIsNavMeshLoaded = bool(*)();
 using fIsNavPathActive = bool(*)();
@@ -10,25 +9,14 @@ using fIsNavPathPaused = bool(*)();
 
 unsigned long long NavTimer = 0;
 
-static PMQPLUGIN FindMQ2NavPlugin()
+static MQPlugin* FindMQ2NavPlugin()
 {
-	PMQPLUGIN pPlugin = pPlugins;
-	while (pPlugin)
-	{
-		if (!_stricmp("MQ2Nav", pPlugin->szFilename))
-		{
-			return pPlugin;
-		}
-
-		pPlugin = pPlugin->pNext;
-	}
-
-	return nullptr;
+	return GetPlugin("MQ2Nav");
 }
 
 float PathLength(unsigned long SpawnID)
 {
-	PMQPLUGIN pNav;
+	MQPlugin* pNav;
 	fGetNavPathLength NavPathLength = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
@@ -49,7 +37,7 @@ float PathLength(unsigned long SpawnID)
 
 bool PathExists(unsigned long SpawnID)
 {
-	PMQPLUGIN pNav;
+	MQPlugin* pNav;
 	fIsNavPossible NavPathExists = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
@@ -70,7 +58,7 @@ bool PathExists(unsigned long SpawnID)
 
 bool MeshLoaded()
 {
-	PMQPLUGIN pNav;
+	MQPlugin* pNav;
 	fIsNavMeshLoaded NavMeshLoaded = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
@@ -86,7 +74,7 @@ bool MeshLoaded()
 
 bool NavActive()
 {
-	PMQPLUGIN pNav;
+	MQPlugin* pNav;
 	fIsNavPathActive NavPathActive = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
@@ -101,7 +89,7 @@ bool NavActive()
 
 bool NavPaused()
 {
-	PMQPLUGIN pNav;
+	MQPlugin* pNav;
 	fIsNavPathPaused NavPathPaused = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
@@ -116,7 +104,7 @@ bool NavPaused()
 
 void NavCommand(char* szLine)
 {
-	PMQPLUGIN pNav;
+	MQPlugin* pNav;
 	fExecuteNavCommand TheNavCommand = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{
@@ -140,7 +128,7 @@ void NavCommand(char* szLine)
 
 void NavEnd()
 {
-	PMQPLUGIN pNav;
+	MQPlugin* pNav;
 	fExecuteNavCommand TheNavCommand = 0;
 	if (pNav = FindMQ2NavPlugin())
 	{

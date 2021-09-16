@@ -13,48 +13,30 @@ public:
 		TypeMember(Version);//2,
 	}
 
-	~MQ2FarmType()
+	virtual bool GetMember(MQVarPtr VarPtr, const char* Member, char* Index, MQTypeVar& Dest) override
 	{
-	}
-
-	bool GetMember(MQ2VARPTR VarPtr, char* Member, char* Index, MQ2TYPEVAR &Dest)
-	{
-		PMQ2TYPEMEMBER pMember = MQ2FarmType::FindMember(Member);
+		MQTypeMember* pMember = FindMember(Member);
 		if (!pMember)
 			return false;
-		switch ((FarmMembers)pMember->ID)
+		switch (pMember->ID)
 		{
 		case TargetID:
 			Dest.DWord = MyTargetID;
-			Dest.Type = pIntType;
+			Dest.Type = datatypes::pIntType;
 			return true;
 		case Version:
-			Dest.Ptr = VERSION;
-			Dest.Type = pStringType;
+            sprintf_s(DataTypeTemp, "%1.2f", MQ2Version);
+            Dest.Ptr  = &DataTypeTemp[0];
+			Dest.Type = datatypes::pStringType;
 			return true;
 		}
 		return false;
 	}
-
-	bool ToString(MQ2VARPTR VarPtr, char* Destination)
-	{
-		return true;
-	}
-
-	bool FromData(MQ2VARPTR &VarPtr, MQ2TYPEVAR &Source)
-	{
-		return false;
-	}
-
-	bool FromString(MQ2VARPTR &VarPtr, char* Source)
-	{
-		return false;
-	}
 };
 
-class MQ2FarmType *pFarmType = 0;
+inline class MQ2FarmType *pFarmType = nullptr;
 
-BOOL dataFarm(char* szIndex, MQ2TYPEVAR &Ret)
+inline bool dataFarm(const char* szIndex, MQTypeVar& Ret)
 {
 	if (szIndex != NULL)
 	{

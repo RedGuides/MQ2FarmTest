@@ -18,11 +18,11 @@ float PathLength(unsigned long SpawnID);
 
 inline bool Casting();
 inline bool InGame();
-inline float PercentMana(PSPAWNINFO &pSpawn);
-inline float PercentHealth(PSPAWNINFO &pSpawn);
-inline float PercentEndurance(PSPAWNINFO &pSpawn);
+inline float PercentMana(PlayerClient* pSpawn);
+inline float PercentHealth(PlayerClient* pSpawn);
+inline float PercentEndurance(PlayerClient* pSpawn);
 
-static PMQPLUGIN FindMQ2NavPlugin();
+static MQPlugin* FindMQ2NavPlugin();
 
 void CastDetrimentalSpells();
 void CheckAlias();
