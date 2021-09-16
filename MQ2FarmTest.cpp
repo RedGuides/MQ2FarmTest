@@ -1,69 +1,71 @@
 /* MQ2FarmTest.cpp
- Chatwiththisname/PeteSampras - Started MQ2Farm Initial Setup/Preperation
- Chatwiththisname/Renji - 10/07/2018 - Worked SpawnSearch and Nav Code
- Chatwiththisname 10/8/2018 - Working on Algorithms for Farming.
-							- Adding FarmCommand Functionality.
-							- Added Health/Endurance/Mana Checks, still requires logic for resting routines.
-							- Added HaveAggro() function. Returns true if any Autohaters are populated on Xtargetlist.
- Chatwiththisname 10/16/2018 - Test has been down a while, but added a getFirstAggroed() function to try and
-							 - deal with aggro before trying to find a mob with a shortest path to fix
-							 - ignoring aggrod mobs.
- Chatwiththisname 11/12/2018 - Working on CastDetrimental() function to cast single target detrimental spells.
-							 - Added rest routines.
- Chatwiththisname 1/2/2019 - Cleaning up the code to remove all the comments.
-						   - trying to add Discs to combat routines, not having much luck.
-						   - Separated FarmTest into seperate files.
-						   - Tried adding TLO and member support. No luck, but kept the file.
- Chatwiththisname 1/3/2019 - Now generating a list of Discs for toons to use and separating them to sections.
-						   - Firing Discs during combat based on the previously mentioned list.
-						   - DiscReady function now checks endurance/mana/reagent requirements before reporting true.
-						   - Actually enjoying testing this on my berserker. He's doing pretty good DPS without MQ2Melee.
- Chatwiththisname 1/5/2019 - Got the Farm datatype fixed and added two members. TargetID and Version. ${Farm.TargetID} ${Farm.Version}
-						   - Cleaned up FarmCommand and it now report invalid command.
-						   - Made additions to ignorethese and ignorethis.
-						   - "/farm " Help list of commands updated to show all commands for current build.
-						   - Now sitting when no target is found to kill while it waits for more things to spawn or wander in range.
-						   - DiscReady function now makes sure you aren't trying to use an active disc when you already have one running.
-						   - Added usage of Instant cast beneficial buffs while in combat.
-						   - Made a HUD for use with the ${Farm.TargetID} to get a display of what it's going after and some information, useful for debugging. :-)
-						   - You can now add and remove Discs with INI entries. [DiscRemove] section for removing. [DiscAdd] section for Additions.
- Chatwiththisname 1/6/2019 - INI's are now character specific, stored in release folder as MQ2FarmTest_CharacterName.ini
-						   - Discs are now grabbed and sorted when the /farm on command is given instead of when the plugin loads.
- Chatwiththisname 1/7/2019 - Added more refined sorting for summmoning discs and Endurance Regenaration Discs.
-						   - Adding abilities base on the INI is no longer Rank Specific.
-						   - Removing Combat Abilities base on the INI is no longer rank specific.
-						   - INI Name now updated when the farm command is used for anything to ensure that the proper file is being written to.
-						   - Added in the casting of Aura Discs and Endurance Regen Discs for use out of combat.
-						   - Refined ActiveDisc detections to eliminate trying to use a disc when there is already an active disc, but allow the use of combat abilities unhindered.
- Chatwiththisname 1/20/2019 - Added the use of the FarmMobIgnored.ini file in the macro folder for the global ignores
-							  so players didn't need to reinvent the wheel and could use the existing ignores file.
-							- Added group health mana and endurance checks so you can now have the merc tag along
-							  without worry of running them out of mana.
-							- Reduced the delay between pulses by 1/3rd
-							- Nav will now refresh destination if target is moving while navigating to the selected spawn.
-							- Made some adjustments to stopping distance to prevent "You are to far away" issues.
-							- Discs now verify target is in range before attempting to use if you have a target.
-							- Fixed a crash that occured if no valid spawns were found.
- Chatwiththisname 1/22/2019 - CHANGE: Fixed a typo in setting the ignore file, changed from FarmMobIgnores.ini to FarmMobIgnored.ini
- Chatwiththisname 1/28/2019 - CHANGE: If the pSpawn has no ManaMax, lie and say they're at 100% mana, even if they don't have a mana bar (rogue merc fix)
-							- CHANGE: Added a delay after a disc is used before sitting again to avoid interupting discs during downtimes
-							- CHANGE: Tell user about the "/farm help" command on initilize.
-							- CHANGE: "/farm off" doesn't turn off attack if it's on? Bug or feature? Check for aggro, if none, turn off
-							  attack, otherwise leave it on?
-							- CHANGE: Add a message to let the user know there are no valid targets nearby and you are sitting while waiting for more.
- Chatwiththisname 1/29/2019 - CHANGE: Changed the distance checks to Distance3DToSpawn function instead of GetDistance
-							- CHANGE: No longer checking Health/Mana/Endurance for you or group while you have Aggro.
-							- CHANGE: Adjust a "radius" circle on MQ2Map to depict the Radius engage
-							- CHANGE: Added /farm command param "ShowSettings" to display all valid settings.
-							- CHANGE: Gave radius a purpose. Set it so that where you issue the /farm on command is the anchor point for all potential
-							  target consideration, and the user should not select entities outside of that circle when farming.
-							- CHANGE: Added the /permignore command to replicate the usage in the macro
-							- CHANGE: Added DeathChecks and Missing Group members checks. These are the same thing as far as the plugin is concerned.
-							- CHANGE: DeathCheck includes mercenary's correctly. Not yet handling reviving them.
+ * Chatwiththisname/PeteSampras - Started MQ2Farm Initial Setup/Preperation
+ * Chatwiththisname/Renji - 10/07/2018 - Worked SpawnSearch and Nav Code
+ * Chatwiththisname 10/8/2018 - Working on Algorithms for Farming.
+ *                            - Adding FarmCommand Functionality.
+ *                            - Added Health/Endurance/Mana Checks, still requires logic for resting routines.
+ *                            - Added HaveAggro() function. Returns true if any Autohaters are populated on Xtargetlist.
+ * Chatwiththisname 10/16/2018 - Test has been down a while, but added a getFirstAggroed() function to try and
+ *                             - deal with aggro before trying to find a mob with a shortest path to fix
+ *                             - ignoring aggrod mobs.
+ * Chatwiththisname 11/12/2018 - Working on CastDetrimental() function to cast single target detrimental spells.
+ *                             - Added rest routines.
+ * Chatwiththisname 1/2/2019 - Cleaning up the code to remove all the comments.
+ *                           - trying to add Discs to combat routines, not having much luck.
+ *                           - Separated FarmTest into seperate files.
+ *                           - Tried adding TLO and member support. No luck, but kept the file.
+ * Chatwiththisname 1/3/2019 - Now generating a list of Discs for toons to use and separating them to sections.
+ *                           - Firing Discs during combat based on the previously mentioned list.
+ *                           - DiscReady function now checks endurance/mana/reagent requirements before reporting true.
+ *                           - Actually enjoying testing this on my berserker. He's doing pretty good DPS without MQ2Melee.
+ * Chatwiththisname 1/5/2019 - Got the Farm datatype fixed and added two members. TargetID and Version. ${Farm.TargetID} ${Farm.Version}
+ *                           - Cleaned up FarmCommand and it now report invalid command.
+ *                           - Made additions to ignorethese and ignorethis.
+ *                           - "/farm " Help list of commands updated to show all commands for current build.
+ *                           - Now sitting when no target is found to kill while it waits for more things to spawn or wander in range.
+ *                           - DiscReady function now makes sure you aren't trying to use an active disc when you already have one running.
+ *                           - Added usage of Instant cast beneficial buffs while in combat.
+ *                           - Made a HUD for use with the ${Farm.TargetID} to get a display of what it's going after and some information, useful for debugging. :-)
+ *                           - You can now add and remove Discs with INI entries. [DiscRemove] section for removing. [DiscAdd] section for Additions.
+ * Chatwiththisname 1/6/2019 - INI's are now character specific, stored in release folder as MQ2FarmTest_CharacterName.ini
+ *                           - Discs are now grabbed and sorted when the /farm on command is given instead of when the plugin loads.
+ * Chatwiththisname 1/7/2019 - Added more refined sorting for summmoning discs and Endurance Regenaration Discs.
+ *                           - Adding abilities base on the INI is no longer Rank Specific.
+ *                           - Removing Combat Abilities base on the INI is no longer rank specific.
+ *                           - INI Name now updated when the farm command is used for anything to ensure that the proper file is being written to.
+ *                           - Added in the casting of Aura Discs and Endurance Regen Discs for use out of combat.
+ *                           - Refined ActiveDisc detections to eliminate trying to use a disc when there is already an active disc, but allow the use of combat abilities unhindered.
+ * Chatwiththisname 1/20/2019 - Added the use of the FarmMobIgnored.ini file in the macro folder for the global ignores
+ *                              so players didn't need to reinvent the wheel and could use the existing ignores file.
+ *                            - Added group health mana and endurance checks so you can now have the merc tag along
+ *                              without worry of running them out of mana.
+ *                            - Reduced the delay between pulses by 1/3rd
+ *                            - Nav will now refresh destination if target is moving while navigating to the selected spawn.
+ *                            - Made some adjustments to stopping distance to prevent "You are to far away" issues.
+ *                            - Discs now verify target is in range before attempting to use if you have a target.
+ *                            - Fixed a crash that occured if no valid spawns were found.
+ * Chatwiththisname 1/22/2019 - CHANGE: Fixed a typo in setting the ignore file, changed from FarmMobIgnores.ini to FarmMobIgnored.ini
+ * Chatwiththisname 1/28/2019 - CHANGE: If the pSpawn has no ManaMax, lie and say they're at 100% mana, even if they don't have a mana bar (rogue merc fix)
+ *                            - CHANGE: Added a delay after a disc is used before sitting again to avoid interupting discs during downtimes
+ *                            - CHANGE: Tell user about the "/farm help" command on initilize.
+ *                            - CHANGE: "/farm off" doesn't turn off attack if it's on? Bug or feature? Check for aggro, if none, turn off
+ *                              attack, otherwise leave it on?
+ *                            - CHANGE: Add a message to let the user know there are no valid targets nearby and you are sitting while waiting for more.
+ * Chatwiththisname 1/29/2019 - CHANGE: Changed the distance checks to Distance3DToSpawn function instead of GetDistance
+ *                            - CHANGE: No longer checking Health/Mana/Endurance for you or group while you have Aggro.
+ *                            - CHANGE: Adjust a "radius" circle on MQ2Map to depict the Radius engage
+ *                            - CHANGE: Added /farm command param "ShowSettings" to display all valid settings.
+ *                            - CHANGE: Gave radius a purpose. Set it so that where you issue the /farm on command is the anchor point for all potential
+ *                              target consideration, and the user should not select entities outside of that circle when farming.
+ *                            - CHANGE: Added the /permignore command to replicate the usage in the macro
+ *                            - CHANGE: Added DeathChecks and Missing Group members checks. These are the same thing as far as the plugin is concerned.
+ *                            - CHANGE: DeathCheck includes mercenary's correctly. Not yet handling reviving them.
+ *
+ *                            - TODO: Fix spell casting...yes, really...maybe....I'm not sure.
+ *                            - TODO: Handle Dead mercs appropriately. (Gah, window access?)
+**/
 
-							- TODO: Fix spell casting...yes, really...maybe....I'm not sure.
-							- TODO: Handle Dead mercs appropriately. (Gah, window access?)
-
+/*
 [DiscRemove]
 DiscRemove1=Hiatus
 DiscRemove2=Mangling Discipline
