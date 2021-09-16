@@ -1392,22 +1392,59 @@ bool SpellsMemorized()
 	return false;
 }
 
-inline float PercentMana(PlayerClient* pSpawn)
+inline float PercentMana(const PlayerClient* pSpawn)
 {
-	if (unsigned long maxmana = pSpawn->GetMaxMana())
-		return (float)pSpawn->GetCurrentMana() * 100 / maxmana;
-	else
-		return 100.0f;
+	if (!InGame() || !pSpawn)
+		return 0;
+
+	//if it's me.
+	if (!_stricmp(GetCharInfo()->pSpawn->DisplayedName, pSpawn->DisplayedName)) {
+#if !defined(ROF2EMU) && !defined(UFEMU)
+		if (pSpawn->GetMaxMana() <= 0) return 100.0f;
+		return ((float)pSpawn->GetCurrentMana() / (float)pSpawn->GetMaxMana()) * 100.0f;
+#else
+		if (GetMaxMana() <= 0) return 100.0f;
+		return ((float)GetPcProfile()->Mana / (float)GetMaxMana() * 100.0f);
+#endif
+	}
+	//if it's not me.
+	return (float)pSpawn->GetCurrentMana();
 }
 
-inline float PercentHealth(PlayerClient* pSpawn)
+inline float PercentHealth(const PlayerClient* pSpawn)
 {
-	return (float)pSpawn->HPCurrent / (float)pSpawn->HPMax * 100.0f;
+	if (!pSpawn)
+		return 0.0f;
+
+	PlayerClient* me = GetCharInfo()->pSpawn;
+	if (!me)
+		return 0.0f;
+
+	if (me->SpawnID == pSpawn->SpawnID) {
+		int maxhp = (int)pSpawn->HPMax;
+		if (maxhp != 0) {
+			return (float)(GetCurHPS() * 100 / maxhp);
+		}
+	}
+	else if (pSpawn->HPCurrent >= 0 && pSpawn->HPCurrent <= 100) {
+		return (float)pSpawn->HPCurrent;
+	}
+
+	return 0.0f;
 }
 
-inline float PercentEndurance(PlayerClient* pSpawn)
+inline float PercentEndurance(const PlayerClient* pSpawn)
 {
-	return (float)pSpawn->GetCurrentEndurance() / (float)pSpawn->GetMaxEndurance() * 100.0f;
+	if (!_stricmp(GetCharInfo()->pSpawn->DisplayedName, pSpawn->DisplayedName)) {
+#if !defined(ROF2EMU) && !defined(UFEMU)
+		if (pSpawn->GetMaxEndurance() <= 0) return 100.0f;
+		return ((float)pSpawn->GetCurrentEndurance() / (float)pSpawn->GetMaxEndurance()) * 100.0f;
+#else
+		if (GetMaxEndurance() <= 0) return 100.0f;
+		return ((float)GetPcProfile()->Endurance / (float)GetMaxEndurance() * 100.0f);
+#endif
+	}
+	return (float)pSpawn->GetCurrentEndurance();
 }
 
 void NavigateToID(unsigned long ID) {
