@@ -1307,7 +1307,7 @@ unsigned long getFirstAggroed()
 		if (xts.xTargetType != XTARGET_AUTO_HATER)
 			continue;
 
-		if (PlayerClient* pSpawn = GetSpawnByID(xts.SpawnID)) {
+		if (PlayerClient* pSpawn = GetSpawnByID(xts.SpawnID)) {//This is the first aggroed, not the closest lol. Maybe fix it?
 			//WriteChatf("I have aggro from: %s", pSpawn->Name);
 			return xts.SpawnID;
 		}
@@ -1952,7 +1952,7 @@ void PermIgnoreCommand(PlayerClient* pChar, char* szline) {
 
 	char temp[MAX_STRING] = { 0 };
 	char temp1[MAX_STRING] = { 0 };
-#define pZone ((PZONEINFO)pZoneInfo)
+	ZONEINFO* pZone = pZoneInfo;
 	VerifyINI(pZone->ShortName, "Ignored", "|", IgnoresFileName);
 	GetPrivateProfileString(pZone->ShortName, "Ignored", "|", temp, MAX_STRING, IgnoresFileName);
 
@@ -1986,8 +1986,6 @@ void PermIgnoreCommand(PlayerClient* pChar, char* szline) {
 			return;
 		}
 	}
-
-#undef pZone
 }
 
 
