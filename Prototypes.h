@@ -18,9 +18,9 @@ float PathLength(unsigned long SpawnID);
 
 inline bool Casting();
 inline bool InGame();
-inline float PercentMana(PlayerClient* pSpawn);
-inline float PercentHealth(PlayerClient* pSpawn);
-inline float PercentEndurance(PlayerClient* pSpawn);
+inline float PercentMana(const PlayerClient* pSpawn);
+inline float PercentHealth(const PlayerClient* pSpawn);
+inline float PercentEndurance(const PlayerClient* pSpawn);
 
 static MQPlugin* FindMQ2NavPlugin();
 
