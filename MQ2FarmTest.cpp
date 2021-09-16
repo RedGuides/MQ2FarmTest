@@ -84,8 +84,9 @@ PLUGIN_API void ShutdownPlugin()
 
 bool Moving(PlayerClient* pSpawn) {
 	if (!pSpawn)
-		return false;//Need to add in mounts movement
-	PlayerClient* theSpawn = pSpawn;//Probably shouldn't modify the pSpawn directly.
+		return false;
+
+	PlayerClient* theSpawn = pSpawn;
 
 	if (pSpawn->Mount)
 		theSpawn = pSpawn->Mount;
@@ -108,7 +109,7 @@ PLUGIN_API void OnPulse()
 		if (!AmIReady()) {
 			if (NavActive())
 				NavEnd();
-			if (GetCharInfo()->pSpawn->StandState == STANDSTATE_STAND && !Casting() && DiscLastTimeUsed < GetTickCount64() && !Moving(nullptr))
+			if (GetCharInfo()->pSpawn->StandState == STANDSTATE_STAND && !Casting() && DiscLastTimeUsed < GetTickCount64() && !Moving(pLocalPlayer))
 				EzCommand("/sit");
 			return;
 		}
@@ -200,7 +201,7 @@ inline bool InGame()
 void DoINIThings()
 {
 	char temp[MAX_STRING] = { 0 };
-	DebugSpewAlways("Initializing MQ2FarmTest");
+
 	//Check for INI entry for Key Debugging in General section.
 	VerifyINI("General", "Debugging", "false", ThisINIFileName);
 	GetPrivateProfileString("General", "Debugging", "false", temp, MAX_STRING, ThisINIFileName);
@@ -738,6 +739,17 @@ void FarmCommand(PlayerClient* pChar, char* Line) {
 
 //End Farm Commands
 
+PlayerClient* Me()
+{
+	if (!InGame())
+		return nullptr;
+
+	if (PlayerClient* me = pLocalPlayer)
+		return me;
+
+	return nullptr;
+}
+
 //Example: SearchSpawns("npc noalert 1 targetable radius 100 zradius 50");
 unsigned long SearchSpawns(char* szIndex)
 {
@@ -778,10 +790,10 @@ unsigned long SearchSpawns(char* szIndex)
 		if (countersincefound > 50)
 			break;
 
-		if (Debugging && N > 500)
-			WriteChatf("N was greater than 500, not checking all the mobs!");
+		if (Debugging && N > 200)
+			WriteChatf("N was greater than 200, not checking all the mobs!");
 
-		if (EQP_DistArray[N].Value.Float > ssSpawn.FRadius && !ssSpawn.bKnownLocation || N > 500)
+		if (EQP_DistArray[N].Value.Float > ssSpawn.FRadius && !ssSpawn.bKnownLocation || N > 200)
 			break;
 
 		if (!SpawnMatchesSearch(&ssSpawn, pCharSpawn, (PlayerClient*)EQP_DistArray[N].VarPtr.Ptr))
@@ -791,16 +803,65 @@ unsigned long SearchSpawns(char* szIndex)
 		if (!pSpawn)
 			continue;
 
-		if (strlen(pSpawn->Lastname))
-			if (_stricmp(pSpawn->Lastname, "Brass Phoenix Brigade")) ////Stratos
-				if (_stricmp(pSpawn->Lastname, "Brass Phoenix Legion"))//Stratos
-					if (_stricmp(pSpawn->Lastname, "Contingent of the Alabaster Owl"))//Stratos
-						if (_stricmp(pSpawn->Lastname, "Company of the Alabaster Owl"))//Stratos
+		//does the mob have a LastName? This is the title UNDER their name, not an actual last name for NPCs.
+		if (strlen(pSpawn->Lastname)) {
+			if (_stricmp(pSpawn->Lastname, "Brass Phoenix Brigade")) { ////Stratos
+				if (_stricmp(pSpawn->Lastname, "Brass Phoenix Legion")) {//Stratos
+					if (_stricmp(pSpawn->Lastname, "Contingent of the Alabaster Owl")) {//Stratos
+						if (_stricmp(pSpawn->Lastname, "Company of the Alabaster Owl")) {//Stratos
 							if (_stricmp(pSpawn->Lastname, "Diseased")) {//Mobs in OT with (Diseased) under their name.
-								if (Debugging)
-									WriteChatf("%s Spawn: %s has a lastname -- %s.", PLUGINMSG, pSpawn->Name, pSpawn->Lastname);
-								continue;
+								if (Me() && IsPluginLoaded("MQ2Headshot")) {//Look for last names from MQ2Headshot
+									bool bHeadshotText = false;
+									switch (Me()->GetClass()) {
+										//"UNDEAD"
+										case Cleric:
+										case Paladin:
+										case Shadowknight:
+										case Necromancer:
+											if (strstr(pSpawn->Lastname, "UNDEAD"))
+												bHeadshotText = true;
+											break;
+
+											//"HEADSHOT"
+										case Ranger:
+											if (strstr(pSpawn->Lastname, "HEADSHOT"))
+												bHeadshotText = true;
+											break;
+
+											//"SUMMONED"
+										case Druid:
+										case Mage:
+											if (strstr(pSpawn->Lastname, "SUMMONED"))
+												bHeadshotText = true;
+											break;
+
+											//"ASSASSINATE"
+										case Rogue:
+											if (strstr(pSpawn->Lastname, "ASSASSINATE"))
+												bHeadshotText = true;
+											break;
+
+											//"DECAPITATE"
+										case Berserker:
+											if (strstr(pSpawn->Lastname, "DECAPITATE"))
+												bHeadshotText = true;
+											break;
+										default:
+											break;
+									}
+
+									if (Debugging && !bHeadshotText)
+										WriteChatf("%s [DEBUGPULL] Spawn: \ag%s\ax ID: \ay%lu\ax has a lastname -- %s.", PLUGINMSG, pSpawn->Name, pSpawn->SpawnID, pSpawn->Lastname);
+
+									if (!bHeadshotText)//If we got here and it's not headshot, skip this spawn.
+										continue;
+								}
 							}
+						}
+					}
+				}
+			}
+		}
 
 		{
 			char temp[MAX_STRING] = { 0 };
