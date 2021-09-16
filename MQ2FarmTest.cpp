@@ -1250,52 +1250,47 @@ void CastDetrimentalSpells()
 		GemIndex = 0;
 	}
 
-	SPELL *spell = GetSpellByID(GetPcProfile()->MemorizedSpells[GemIndex]);
-	while (!spell) {
-		GemIndex++;
-		if (GemIndex > 13)
-			GemIndex = 0;
-
+	SPELL* spell = nullptr;
+	for (GemIndex = 0; GemIndex < MAX_MEMORIZED_SPELLS; GemIndex++) {
 		spell = GetSpellByID(GetPcProfile()->MemorizedSpells[GemIndex]);
-	}
+		if (spell && spell->CanCastInCombat) {
+			//BYTE    TargetType;         //03=Group v1, 04=PB AE, 05=Single, 06=Self, 08=Targeted AE, 0e=Pet, 28=AE PC v2, 29=Group v2, 2a=Directional
+			if (spell->TargetType == 05) {
+				//*0x180*/   BYTE    SpellType;          //0=detrimental, 1=Beneficial, 2=Beneficial, Group Only
+				if (spell->SpellType == 0) {
+					if (Moving(Me())) {
+						if (Debugging)
+							WriteChatf("Ending Navigation to cast");
 
-	if (spell && spell->CanCastInCombat) {
-		//BYTE    TargetType;         //03=Group v1, 04=PB AE, 05=Single, 06=Self, 08=Targeted AE, 0e=Pet, 28=AE PC v2, 29=Group v2, 2a=Directional
-		if (spell->TargetType == 05) {
-			//*0x180*/   BYTE    SpellType;          //0=detrimental, 1=Beneficial, 2=Beneficial, Group Only
-			if (spell->SpellType == 0) {
-				if (GetCharInfo()->pSpawn->SpeedRun > 0.0f) {
+						if (NavActive())
+							NavEnd();
+					}
+
 					if (Debugging)
-						WriteChatf("Ending Navigation to cast");
+						WriteChatf("Spell: %s, TargetType: %d, SpellType: %d", spell->Name, spell->TargetType, spell->SpellType);
 
-					if (NavActive())
-						NavEnd();
-				}
+					char castcommand[MAX_STRING] = "/cast ";
+					std::string s = std::to_string(GemIndex + 1);
+					strcat_s(castcommand, MAX_STRING, s.c_str());
 
-				if (Debugging)
-					WriteChatf("Spell: %s, TargetType: %d, SpellType: %d", spell->Name, spell->TargetType, spell->SpellType);
-
-				char castcommand[MAX_STRING] = "/cast ";
-				std::string s = std::to_string(GemIndex + 1);
-				strcat_s(castcommand, MAX_STRING, s.c_str());
-
-				if (GetCharInfo()->pSpawn->GetCurrentMana() > (int)spell->ManaCost) {
-					if (pTarget && Distance3DToSpawn(GetCharInfo()->pSpawn, pTarget) < spell->Range) {
-						WriteChatf("%s\arCasting \a-t----> \ap%s \ayfrom Gem %d", PLUGINMSG, spell->Name, GemIndex + 1);
-						EzCommand(castcommand);
-						CastLastTimeUsed = GetTickCount64();
+					if (GetCharInfo()->pSpawn->GetCurrentMana() > spell->ManaCost) {
+						if (pTarget && Distance3DToSpawn(GetCharInfo()->pSpawn, pTarget) < spell->Range) {
+							WriteChatf("%s\arCasting \a-t----> \ap%s \ayfrom Gem %d", PLUGINMSG, spell->Name, GemIndex + 1);
+							EzCommand(castcommand);
+							CastLastTimeUsed = GetTickCount64();
+							break;//if we cast a spell, break out of the loop early.
+						}
+						else if (Debugging) {
+							WriteChatf("Target not in range, or no target.");
+						}
 					}
 					else if (Debugging) {
-							WriteChatf("Target not in range, or no target.");
-					}
-				}
-				else if (Debugging) {
 						WriteChatf("Not enough Mana to cast %s", spell->Name);
+					}
 				}
 			}
 		}
 	}
-	GemIndex++;
 }
 
 unsigned long getFirstAggroed()
