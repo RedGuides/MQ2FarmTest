@@ -1,71 +1,11 @@
 /* MQ2FarmTest.cpp
- * Chatwiththisname/PeteSampras - Started MQ2Farm Initial Setup/Preperation
- * Chatwiththisname/Renji - 10/07/2018 - Worked SpawnSearch and Nav Code
- * Chatwiththisname 10/8/2018 - Working on Algorithms for Farming.
- *                            - Adding FarmCommand Functionality.
- *                            - Added Health/Endurance/Mana Checks, still requires logic for resting routines.
- *                            - Added HaveAggro() function. Returns true if any Autohaters are populated on Xtargetlist.
- * Chatwiththisname 10/16/2018 - Test has been down a while, but added a getFirstAggroed() function to try and
- *                             - deal with aggro before trying to find a mob with a shortest path to fix
- *                             - ignoring aggrod mobs.
- * Chatwiththisname 11/12/2018 - Working on CastDetrimental() function to cast single target detrimental spells.
- *                             - Added rest routines.
- * Chatwiththisname 1/2/2019 - Cleaning up the code to remove all the comments.
- *                           - trying to add Discs to combat routines, not having much luck.
- *                           - Separated FarmTest into seperate files.
- *                           - Tried adding TLO and member support. No luck, but kept the file.
- * Chatwiththisname 1/3/2019 - Now generating a list of Discs for toons to use and separating them to sections.
- *                           - Firing Discs during combat based on the previously mentioned list.
- *                           - DiscReady function now checks endurance/mana/reagent requirements before reporting true.
- *                           - Actually enjoying testing this on my berserker. He's doing pretty good DPS without MQ2Melee.
- * Chatwiththisname 1/5/2019 - Got the Farm datatype fixed and added two members. TargetID and Version. ${Farm.TargetID} ${Farm.Version}
- *                           - Cleaned up FarmCommand and it now report invalid command.
- *                           - Made additions to ignorethese and ignorethis.
- *                           - "/farm " Help list of commands updated to show all commands for current build.
- *                           - Now sitting when no target is found to kill while it waits for more things to spawn or wander in range.
- *                           - DiscReady function now makes sure you aren't trying to use an active disc when you already have one running.
- *                           - Added usage of Instant cast beneficial buffs while in combat.
- *                           - Made a HUD for use with the ${Farm.TargetID} to get a display of what it's going after and some information, useful for debugging. :-)
- *                           - You can now add and remove Discs with INI entries. [DiscRemove] section for removing. [DiscAdd] section for Additions.
- * Chatwiththisname 1/6/2019 - INI's are now character specific, stored in release folder as MQ2FarmTest_CharacterName.ini
- *                           - Discs are now grabbed and sorted when the /farm on command is given instead of when the plugin loads.
- * Chatwiththisname 1/7/2019 - Added more refined sorting for summmoning discs and Endurance Regenaration Discs.
- *                           - Adding abilities base on the INI is no longer Rank Specific.
- *                           - Removing Combat Abilities base on the INI is no longer rank specific.
- *                           - INI Name now updated when the farm command is used for anything to ensure that the proper file is being written to.
- *                           - Added in the casting of Aura Discs and Endurance Regen Discs for use out of combat.
- *                           - Refined ActiveDisc detections to eliminate trying to use a disc when there is already an active disc, but allow the use of combat abilities unhindered.
- * Chatwiththisname 1/20/2019 - Added the use of the FarmMobIgnored.ini file in the macro folder for the global ignores
- *                              so players didn't need to reinvent the wheel and could use the existing ignores file.
- *                            - Added group health mana and endurance checks so you can now have the merc tag along
- *                              without worry of running them out of mana.
- *                            - Reduced the delay between pulses by 1/3rd
- *                            - Nav will now refresh destination if target is moving while navigating to the selected spawn.
- *                            - Made some adjustments to stopping distance to prevent "You are to far away" issues.
- *                            - Discs now verify target is in range before attempting to use if you have a target.
- *                            - Fixed a crash that occured if no valid spawns were found.
- * Chatwiththisname 1/22/2019 - CHANGE: Fixed a typo in setting the ignore file, changed from FarmMobIgnores.ini to FarmMobIgnored.ini
- * Chatwiththisname 1/28/2019 - CHANGE: If the pSpawn has no ManaMax, lie and say they're at 100% mana, even if they don't have a mana bar (rogue merc fix)
- *                            - CHANGE: Added a delay after a disc is used before sitting again to avoid interupting discs during downtimes
- *                            - CHANGE: Tell user about the "/farm help" command on initilize.
- *                            - CHANGE: "/farm off" doesn't turn off attack if it's on? Bug or feature? Check for aggro, if none, turn off
- *                              attack, otherwise leave it on?
- *                            - CHANGE: Add a message to let the user know there are no valid targets nearby and you are sitting while waiting for more.
- * Chatwiththisname 1/29/2019 - CHANGE: Changed the distance checks to Distance3DToSpawn function instead of GetDistance
- *                            - CHANGE: No longer checking Health/Mana/Endurance for you or group while you have Aggro.
- *                            - CHANGE: Adjust a "radius" circle on MQ2Map to depict the Radius engage
- *                            - CHANGE: Added /farm command param "ShowSettings" to display all valid settings.
- *                            - CHANGE: Gave radius a purpose. Set it so that where you issue the /farm on command is the anchor point for all potential
- *                              target consideration, and the user should not select entities outside of that circle when farming.
- *                            - CHANGE: Added the /permignore command to replicate the usage in the macro
- *                            - CHANGE: Added DeathChecks and Missing Group members checks. These are the same thing as far as the plugin is concerned.
- *                            - CHANGE: DeathCheck includes mercenary's correctly. Not yet handling reviving them.
- *
- *                            - TODO: Fix spell casting...yes, really...maybe....I'm not sure.
- *                            - TODO: Handle Dead mercs appropriately. (Gah, window access?)
+* by ChatWithThisName w/assistance from PeteSampras and Renji
+*
+*	- TODO: Fix spell casting...yes, really...maybe....I'm not sure.
+*	- TODO: Handle Dead mercs appropriately. (Gah, window access?)
 **/
 
-/*
+/* Example to disable certain discs.
 [DiscRemove]
 DiscRemove1=Hiatus
 DiscRemove2=Mangling Discipline
@@ -94,7 +34,7 @@ PLUGIN_VERSION(0.3);
 
 #define PLUGINMSG "\ar[\a-tMQ2Farm\ar]\ao:: "
 
-void TargetIt(PSPAWNINFO pSpawn) {
+void TargetIt(PlayerClient* pSpawn) {
 	if (!pSpawn)
 		return;
 
@@ -103,7 +43,7 @@ void TargetIt(PSPAWNINFO pSpawn) {
 
 	pTarget = pSpawn;
 	if (pTarget) {
-		if (PSPAWNINFO mytarget = (PSPAWNINFO)pTarget) {
+		if (PlayerClient* mytarget = pTarget) {
 			char szname[64] = { 0 };
 			sprintf_s(szname, 64, "/target id %lu", mytarget->SpawnID);
 			EzCommand(szname);
@@ -142,15 +82,17 @@ PLUGIN_API void ShutdownPlugin()
 	RemoveCommand("/permignore");
 }
 
-bool Moving(PSPAWNINFO pSpawn) {
-	if (!pSpawn) {
-		PSPAWNINFO me = (PSPAWNINFO)pLocalPlayer;
-		if (!me)
-			return false;//Need to add in mounts movement
-		else
-			pSpawn = me;
-	}
-	return abs(pSpawn->SpeedX) + abs(pSpawn->SpeedY) + abs(pSpawn->SpeedZ) ? true : false;
+bool Moving(PlayerClient* pSpawn) {
+	if (!pSpawn)
+		return false;//Need to add in mounts movement
+	PlayerClient* theSpawn = pSpawn;//Probably shouldn't modify the pSpawn directly.
+
+	if (pSpawn->Mount)
+		theSpawn = pSpawn->Mount;
+
+	//the result of this calculation while levitating is 0.01f, even though you're not technically moving.
+	//So we account for that here.
+	return abs(theSpawn->SpeedX) + abs(theSpawn->SpeedY) + abs(theSpawn->SpeedZ) > 0.01f ? true : false;
 }
 
 
@@ -173,7 +115,7 @@ PLUGIN_API void OnPulse()
 		RestRoutines();
 	}
 
-	PSPAWNINFO Mob = (PSPAWNINFO)GetSpawnByID(MyTargetID);
+	PlayerClient* Mob = GetSpawnByID(MyTargetID);
 	if (!Mob || !Mob->SpawnID || Mob->Type == SPAWN_CORPSE) {
 		MyTargetID = 0;
 		ClearTarget();
@@ -182,13 +124,13 @@ PLUGIN_API void OnPulse()
 	if (unsigned long AggroMob = getFirstAggroed()) {
 		if (MyTargetID != AggroMob) {
 			MyTargetID = AggroMob;
-			Mob = (PSPAWNINFO)GetSpawnByID(MyTargetID);
+			Mob = GetSpawnByID(MyTargetID);
 			NavEnd();
 		}
 	} else if (!MyTargetID) {
 		GemIndex = 0;
 		MyTargetID = SearchSpawns(searchString);
-		Mob = (PSPAWNINFO)GetSpawnByID(MyTargetID);
+		Mob = GetSpawnByID(MyTargetID);
 	}
 
 	if (Mob && (HaveAggro() || AmIReady())) {
@@ -366,12 +308,12 @@ void DoINIThings()
 }
 
 //Start Farm Commands
-void IgnoreTheseCommand(PSPAWNINFO pChar, char* szLine)
+void IgnoreTheseCommand(PlayerClient* pChar, char* szLine)
 {
 	if (!strlen(szLine)) {
 		if (pTarget) {
 			char IgnoreString[MAX_STRING];
-			sprintf_s(IgnoreString, MAX_STRING, "add 1 %s", ((PSPAWNINFO)pTarget)->DisplayedName);
+			sprintf_s(IgnoreString, MAX_STRING, "add 1 %s", pTarget->DisplayedName);
 			Alert(GetCharInfo()->pSpawn, IgnoreString);
 			MyTargetID = 0;
 			ClearTarget();
@@ -387,12 +329,12 @@ void IgnoreTheseCommand(PSPAWNINFO pChar, char* szLine)
 	}
 }
 
-void IgnoreThisCommand(PSPAWNINFO pChar, char* szLine)
+void IgnoreThisCommand(PlayerClient* pChar, char* szLine)
 {
 	if (!strlen(szLine)) {
 		if (pTarget) {
 			char IgnoreString[MAX_STRING];
-			sprintf_s(IgnoreString, MAX_STRING, "add 1 %s", ((PSPAWNINFO)pTarget)->Name);
+			sprintf_s(IgnoreString, MAX_STRING, "add 1 %s", pTarget->Name);
 			Alert(GetCharInfo()->pSpawn, IgnoreString);
 			MyTargetID = 0;
 			ClearTarget();
@@ -406,7 +348,7 @@ void IgnoreThisCommand(PSPAWNINFO pChar, char* szLine)
 	}
 }
 
-void FarmCommand(PSPAWNINFO pChar, char* Line) {
+void FarmCommand(PlayerClient* pChar, char* Line) {
 	if (!InGame()) {
 		WriteChatf("%s\arYou can't use this command unless you are in game!", PLUGINMSG);
 		return;
@@ -801,7 +743,7 @@ unsigned long SearchSpawns(char* szIndex)
 {
 	#define pZone ((PZONEINFO)pZoneInfo)
 	double fShortest = 9999.0f;
-	PSPAWNINFO sShortest = nullptr;
+	PlayerClient* sShortest = nullptr;
 	MQSpawnSearch ssSpawn;
 	ClearSearchSpawn(&ssSpawn);
 	ParseSearchSpawn(szIndex, &ssSpawn);
@@ -842,10 +784,10 @@ unsigned long SearchSpawns(char* szIndex)
 		if (EQP_DistArray[N].Value.Float > ssSpawn.FRadius && !ssSpawn.bKnownLocation || N > 500)
 			break;
 
-		if (!SpawnMatchesSearch(&ssSpawn, (PSPAWNINFO)pCharSpawn, (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr))
+		if (!SpawnMatchesSearch(&ssSpawn, pCharSpawn, (PlayerClient*)EQP_DistArray[N].VarPtr.Ptr))
 			continue;
 
-		PSPAWNINFO pSpawn = (PSPAWNINFO)EQP_DistArray[N].VarPtr.Ptr;
+		PlayerClient* pSpawn = (PlayerClient*)EQP_DistArray[N].VarPtr.Ptr;
 		if (!pSpawn)
 			continue;
 
@@ -1139,7 +1081,7 @@ bool AmIReady()
 	}
 	else {
 		//Start Medding Endurance Here.
-		PSPAWNINFO me = GetCharInfo()->pSpawn;
+		PlayerClient* me = GetCharInfo()->pSpawn;
 		if (!GettingEndurance && PercentEndurance(me) < MedEndAt) {
 			if (!GettingEndurance) {
 				GettingEndurance = true;
@@ -1214,7 +1156,7 @@ bool HaveAggro()
 		if (xts.xTargetType != XTARGET_AUTO_HATER)
 			continue;
 
-		if (PSPAWNINFO pSpawn = (PSPAWNINFO)GetSpawnByID(xts.SpawnID)) {
+		if (PlayerClient* pSpawn = GetSpawnByID(xts.SpawnID)) {
 			return true;
 		}
 	}
@@ -1277,7 +1219,7 @@ void CastDetrimentalSpells()
 				strcat_s(castcommand, MAX_STRING, s.c_str());
 
 				if (GetCharInfo()->pSpawn->GetCurrentMana() > (int)spell->ManaCost) {
-					if (pTarget && Distance3DToSpawn(GetCharInfo()->pSpawn, (PSPAWNINFO)pTarget) < spell->Range) {
+					if (pTarget && Distance3DToSpawn(GetCharInfo()->pSpawn, pTarget) < spell->Range) {
 						WriteChatf("%s\arCasting \a-t----> \ap%s \ayfrom Gem %d", PLUGINMSG, spell->Name, GemIndex + 1);
 						EzCommand(castcommand);
 						CastLastTimeUsed = GetTickCount64();
@@ -1309,7 +1251,7 @@ unsigned long getFirstAggroed()
 		if (xts.xTargetType != XTARGET_AUTO_HATER)
 			continue;
 
-		if (PSPAWNINFO pSpawn = (PSPAWNINFO)GetSpawnByID(xts.SpawnID)) {
+		if (PlayerClient* pSpawn = GetSpawnByID(xts.SpawnID)) {
 			//WriteChatf("I have aggro from: %s", pSpawn->Name);
 			return xts.SpawnID;
 		}
@@ -1369,7 +1311,7 @@ float AmFacing(unsigned long ID)
 	if (!InGame())
 		return false;
 
-	PSPAWNINFO pSpawn = (PSPAWNINFO)GetSpawnByID(ID);
+	PlayerClient* pSpawn = GetSpawnByID(ID);
 	if (!pSpawn)
 		return false;
 
@@ -1416,7 +1358,7 @@ void NavigateToID(unsigned long ID) {
 	if (CastLastTimeUsed >= GetTickCount64())
 		return;
 
-	PSPAWNINFO Mob = (PSPAWNINFO)GetSpawnByID(ID);
+	PlayerClient* Mob = GetSpawnByID(ID);
 	if (!Mob)
 		return;
 
@@ -1430,7 +1372,7 @@ void NavigateToID(unsigned long ID) {
 	}
 
 	if (LineOfSight(GetCharInfo()->pSpawn, Mob) && Distance3DToSpawn(GetCharInfo()->pSpawn, Mob) < 75) {
-		if (Mob && pTarget && ((PSPAWNINFO)pTarget)->SpawnID != Mob->SpawnID || !pTarget) {
+		if (Mob && pTarget && pTarget->SpawnID != Mob->SpawnID || !pTarget) {
 			TargetIt(Mob);
 		}
 	}
@@ -1793,10 +1735,10 @@ bool DiscReady(PSPELL pSpell)
 			}
 		}
 		//If I have enough mana and endurance (Never know, might be mana requirements lol).
-		PSPAWNINFO me = GetCharInfo()->pSpawn;
+		PlayerClient* me = GetCharInfo()->pSpawn;
 		if (me->GetCurrentMana() >= (int)pSpell->ManaCost && me->GetCurrentEndurance() >= (int)pSpell->EnduranceCost) {
 			if (pTarget && me) {
-				if (Distance3DToSpawn(me, (PSPAWNINFO)pTarget) > pSpell->Range) {
+				if (Distance3DToSpawn(me, pTarget) > pSpell->Range) {
 					return false;
 				}
 			}
@@ -1911,7 +1853,7 @@ inline bool Casting() {
 }
 
 //NotUsed - Complete TODO!
-void PermIgnoreCommand(PSPAWNINFO pChar, char* szline) {
+void PermIgnoreCommand(PlayerClient* pChar, char* szline) {
 	if (!InGame())
 		return;
 
@@ -1922,17 +1864,17 @@ void PermIgnoreCommand(PSPAWNINFO pChar, char* szline) {
 	GetPrivateProfileString(pZone->ShortName, "Ignored", "|", temp, MAX_STRING, IgnoresFileName);
 
 	if (!strlen(szline) && pTarget) {
-		if (!strstr(temp, ((PSPAWNINFO)pTarget)->DisplayedName)) {
-			sprintf_s(temp1, MAX_STRING, "%s|", ((PSPAWNINFO)pTarget)->DisplayedName);
+		if (!strstr(temp, pTarget->DisplayedName)) {
+			sprintf_s(temp1, MAX_STRING, "%s|", pTarget->DisplayedName);
 			strcat_s(temp, MAX_STRING, temp1);
 			WritePrivateProfileString(pZone->ShortName, "Ignored", temp, IgnoresFileName);
-			WriteChatf("%s\ap%s\ay added to permanent ignore list.", PLUGINMSG, ((PSPAWNINFO)pTarget)->DisplayedName);
+			WriteChatf("%s\ap%s\ay added to permanent ignore list.", PLUGINMSG, pTarget->DisplayedName);
 			ClearTarget();
 			MyTargetID = 0;
 			return;
 		}
 		else {
-			WriteChatf("%s\ap%s\ar is already on the permanent ignore list in the INI", PLUGINMSG, ((PSPAWNINFO)pTarget)->DisplayedName);
+			WriteChatf("%s\ap%s\ar is already on the permanent ignore list in the INI", PLUGINMSG, pTarget->DisplayedName);
 			return;
 		}
 	}
