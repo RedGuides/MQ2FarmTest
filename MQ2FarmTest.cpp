@@ -65,7 +65,7 @@ PLUGIN_API void InitializePlugin()
 	AddCommand("/ignorethese", IgnoreTheseCommand);
 	AddCommand("/ignorethis", IgnoreThisCommand);
 	AddCommand("/permignore", PermIgnoreCommand);
-	WriteChatf("%s\aw- \ag%s", PLUGINMSG, MQ2Version);
+	WriteChatf("%s\aw- \ag%.1f", PLUGINMSG, MQ2Version);
 	WriteChatf("%s \ao/farm help \aw- \ay For a list of commands!", PLUGINMSG);
 	sprintf_s(IgnoresFileName, MAX_STRING, "%s\\FarmMobIgnored.ini", gPathConfig);
 
