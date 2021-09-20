@@ -25,8 +25,8 @@ public:
 			Dest.Type = datatypes::pIntType;
 			return true;
 		case Version:
-            sprintf_s(DataTypeTemp, "%1.2f", MQ2Version);
-            Dest.Ptr  = &DataTypeTemp[0];
+			sprintf_s(DataTypeTemp, "%1.2f", MQ2Version);
+			Dest.Ptr  = &DataTypeTemp[0];
 			Dest.Type = datatypes::pStringType;
 			return true;
 		}
