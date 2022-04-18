@@ -1942,7 +1942,7 @@ void RestRoutines() {
 }
 
 inline bool Casting() {
-	return GetCharInfo()->pSpawn->CastingData.IsCasting();
+	return GetPcProfile()->Class != Bard && GetCharInfo()->pSpawn->CastingData.IsCasting();
 }
 
 //NotUsed - Complete TODO!
