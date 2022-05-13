@@ -1356,8 +1356,8 @@ void PluginOff()
 	MyTargetID = 0;
 	activated = false;
 	NavEnd();
-	if (!HaveAggro() && *EQADDR_ATTACK)
-		*EQADDR_ATTACK = 00000000;
+	if (!HaveAggro() && pEverQuestInfo->bAutoAttack)
+		pEverQuestInfo->bAutoAttack = false;
 
 	WriteChatf("%s\arDeactivated", PLUGINMSG);
 }
@@ -1488,10 +1488,10 @@ void NavigateToID(unsigned long ID) {
 		if (CastDetrimental)
 			CastDetrimentalSpells();
 
-		if (*EQADDR_ATTACK)
+		if (pEverQuestInfo->bAutoAttack)
 			return;
 
-		*EQADDR_ATTACK = 00000001;
+		pEverQuestInfo->bAutoAttack = true;
 		EzCommand("/pet attack");
 		EzCommand("/pet swarm");
 
@@ -1891,7 +1891,7 @@ bool IHaveBuff(PSPELL pSpell) {
 		return false;
 
 	for (int i = 0; i < NUM_LONG_BUFFS; i++) {
-		if (PSPELL pBuff = GetSpellByID(GetPcProfile()->Buff[i].SpellID)) {
+		if (PSPELL pBuff = GetSpellByID(GetPcProfile()->GetEffect(i).SpellID)) {
 			if (strstr(pBuff->Name, pSpell->Name)) {
 				//WriteChatf("---Buff: %s strstr: %i", pBuff->Name, (int)strstr(pBuff->Name, pSpell->Name));
 				return true;
@@ -1900,7 +1900,7 @@ bool IHaveBuff(PSPELL pSpell) {
 	}
 
 	for (int i = 0; i < NUM_SHORT_BUFFS; i++) {
-		if (PSPELL pBuff = GetSpellByID(GetPcProfile()->ShortBuff[i].SpellID)) {
+		if (PSPELL pBuff = GetSpellByID(GetPcProfile()->GetTempEffect(i).SpellID)) {
 			if (strstr(pBuff->Name, pSpell->Name)) {
 				//WriteChatf("---Buff: %s strstr: %i", pBuff->Name, (int)strstr(pBuff->Name, pSpell->Name));
 				return true;
