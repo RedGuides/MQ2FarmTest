@@ -1802,15 +1802,7 @@ bool DiscReady(PSPELL pSpell)
 		return false;
 
 	unsigned long timeNow = (unsigned long)time(NULL);
-#if !defined(ROF2EMU) && !defined(UFEMU)
 	if (pPCData->GetCombatAbilityTimer(pSpell->ReuseTimerIndex, pSpell->SpellGroup) < timeNow && !IHaveBuff(pSpell)) {
-#else
-	if (pSpell->ReuseTimerIndex == -1 || pSpell->ReuseTimerIndex > 20)//this matters on emu it will actually crash u if above 20
-	{
-		return true;
-	}
-	if (pPCData->GetCombatAbilityTimer(pSpell->ReuseTimerIndex) < timeNow && !IHaveBuff(pSpell)) {
-#endif
 		//If substring "Discipline" is found in the name of the disc, this is an active disc. Let's see if there is already one running.
 		if (strstr(pSpell->Name, "Discipline")) {
 			if (pCombatAbilityWnd) {
