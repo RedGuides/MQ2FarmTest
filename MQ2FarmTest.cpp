@@ -1514,7 +1514,7 @@ void DiscSetup()
 
 	for (int i = 0; i < NUM_COMBAT_ABILITIES; i++) {
 		if (pCombatSkillsSelectWnd->ShouldDisplayThisSkill(i)) {
-			if (PSPELL pSpell = GetSpellByID(pPCData->GetCombatAbility(i))) {
+			if (PSPELL pSpell = GetSpellByID(pLocalPC->GetCombatAbility(i))) {
 				//need to make sure the disc is a usable disc. IE: Dichotomic Rage has two abilities, one is level 250.
 				if (pSpell->ClassLevel[GetCharInfo()->pSpawn->mActorClient.Class] <= 110) {
 					if (MaxIndex == 0) {
@@ -1569,7 +1569,7 @@ void DiscSetup()
 			if (PSPELL pSpell = GetSpellByName(temp)) {
 				for (int j = 0; j < NUM_COMBAT_ABILITIES; j++) {
 					if (pCombatSkillsSelectWnd->ShouldDisplayThisSkill(j)) {
-						if (PSPELL pFoundSpell = GetSpellByID(pPCData->GetCombatAbility(j))) {
+						if (PSPELL pFoundSpell = GetSpellByID(pLocalPC->GetCombatAbility(j))) {
 							if (pFoundSpell->SpellGroup == pSpell->SpellGroup && !_strnicmp(pSpell->Name, pFoundSpell->Name, strlen(pSpell->Name))) {
 								for (int k = 0; k < NUM_COMBAT_ABILITIES; k++) {
 									if (CATemp[k] == pFoundSpell->ID) {
@@ -1599,7 +1599,7 @@ void DiscSetup()
 			if (PSPELL pSpell = GetSpellByName(temp)) {
 				for (int j = 0; j < NUM_COMBAT_ABILITIES; j++) {
 					if (pCombatSkillsSelectWnd->ShouldDisplayThisSkill(j)) {
-						if (PSPELL pFoundSpell = GetSpellByID(pPCData->GetCombatAbility(j))) {
+						if (PSPELL pFoundSpell = GetSpellByID(pLocalPC->GetCombatAbility(j))) {
 							if (pFoundSpell->SpellGroup == pSpell->SpellGroup && !_strnicmp(pSpell->Name, pFoundSpell->Name, strlen(pSpell->Name))) {
 								for (int k = 0; k < NUM_COMBAT_ABILITIES; k++) {
 									if (CATemp[k] == -1) {
@@ -1765,7 +1765,7 @@ void UseDiscs()
 				if (SelfBeneficial.at(i)->CanCastInCombat && !SelfBeneficial.at(i)->CastTime && !IHaveBuff(SelfBeneficial.at(i))) {
 					WriteChatf("\agSelf Beneficial \at---\ar> \ap%s", SelfBeneficial.at(i)->Name);
 					DiscLastTimeUsed = GetTickCount64();
-					pCharData->DoCombatAbility(SelfBeneficial.at(i)->ID);
+					pLocalPC->DoCombatAbility(SelfBeneficial.at(i)->ID);
 				}
 			}
 		}
@@ -1777,7 +1777,7 @@ void UseDiscs()
 				if (GroupBeneficial.at(i)->CanCastInCombat && !GroupBeneficial.at(i)->CastTime && !IHaveBuff(GroupBeneficial.at(i))) {
 					WriteChatf("\a-pSelf Beneficial \at---\ar> \ap%s", GroupBeneficial.at(i)->Name);
 					DiscLastTimeUsed = GetTickCount64();
-					pCharData->DoCombatAbility(GroupBeneficial.at(i)->ID);
+					pLocalPC->DoCombatAbility(GroupBeneficial.at(i)->ID);
 				}
 			}
 		}
@@ -1789,7 +1789,7 @@ void UseDiscs()
 				if (SingleDetrimental.at(i)->CanCastInCombat) {
 					WriteChatf("\arSingleDetrimental \at---\ar> \ap%s", SingleDetrimental.at(i)->Name);
 					DiscLastTimeUsed = GetTickCount64();
-					pCharData->DoCombatAbility(SingleDetrimental.at(i)->ID);
+					pLocalPC->DoCombatAbility(SingleDetrimental.at(i)->ID);
 				}
 			}
 		}
@@ -1802,7 +1802,7 @@ bool DiscReady(PSPELL pSpell)
 		return false;
 
 	unsigned long timeNow = (unsigned long)time(NULL);
-	if (pPCData->GetCombatAbilityTimer(pSpell->ReuseTimerIndex, pSpell->SpellGroup) < timeNow && !IHaveBuff(pSpell)) {
+	if (pLocalPC->GetCombatAbilityTimer(pSpell->ReuseTimerIndex, pSpell->SpellGroup) < timeNow && !IHaveBuff(pSpell)) {
 		//If substring "Discipline" is found in the name of the disc, this is an active disc. Let's see if there is already one running.
 		if (strstr(pSpell->Name, "Discipline")) {
 			if (pCombatAbilityWnd) {
@@ -1911,7 +1911,7 @@ void RestRoutines() {
 					if (!Casting()) {
 						WriteChatf("\atAura \at---\ar> \ap%s", Aura.at(i)->Name);
 						DiscLastTimeUsed = GetTickCount64();
-						pCharData->DoCombatAbility(Aura.at(i)->ID);
+						pLocalPC->DoCombatAbility(Aura.at(i)->ID);
 					}
 				}
 			}
@@ -1925,7 +1925,7 @@ void RestRoutines() {
 					if (!Casting()) {
 						WriteChatf("\atEndurance \at---\ar> \ap%s", EndRegen.at(i)->Name);
 						DiscLastTimeUsed = GetTickCount64();
-						pCharData->DoCombatAbility(EndRegen.at(i)->ID);
+						pLocalPC->DoCombatAbility(EndRegen.at(i)->ID);
 					}
 				}
 			}
